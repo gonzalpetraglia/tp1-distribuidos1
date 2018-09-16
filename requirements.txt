@@ -1,1 +1,3 @@
-pytest
+coverage==4.5.1
+coveralls==1.5.0
+pytest==3.8.0
