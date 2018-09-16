@@ -4,4 +4,4 @@ python:
 install:
         - pip install -r requirements.txt
 script:
-        coverage run --source=src src/http_parser.py test && coveralls
+        coverage run --source=src -m test.test_http_parser && coveralls
