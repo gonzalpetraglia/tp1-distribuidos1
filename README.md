@@ -1,5 +1,5 @@
 # tp1-distribuidos1
-[![Build Status](https://travis-ci.org/gonzalpetraglia/tp1-distribuidos1.svg?branch=master)](https://travis-ci.org/gonzalpetraglia/tp1-distribuidos1)
+[![Build Status](https://travis-ci.org/gonzalpetraglia/tp1-distribuidos1.svg?branch=master)](https://travis-ci.org/gonzalpetraglia/tp1-distribuidos1) [![Coverage Status](https://coveralls.io/repos/github/gonzalpetraglia/tp1-distribuidos1/badge.svg)](https://coveralls.io/github/gonzalpetraglia/tp1-distribuidos1)
 
 
 Esta es la resolución del TP 1 de la materia Sistemas Distribuidos 1.
