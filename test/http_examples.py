@@ -12,11 +12,11 @@ http_examples = [
             "request_uri": "/hello.htm",
             "http_version": "HTTP/1.1",
             "headers": {
-                'User-Agent': 'Mozilla/4.0 (compatible; MSIE5.01; Windows NT)',
-                'Host': 'www.tutorialspoint.com',
-                'Accept-Language': 'en-us',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'Keep-Alive'
+                'user-agent': 'Mozilla/4.0 (compatible; MSIE5.01; Windows NT)',
+                'host': 'www.tutorialspoint.com',
+                'accept-language': 'en-us',
+                'accept-encoding': 'gzip, deflate',
+                'connection': 'Keep-Alive'
             },
             "body": ""
         }),
@@ -33,11 +33,11 @@ http_examples = [
             "request_uri": "/t.html",
             "http_version": "HTTP/1.1",
             "headers": {
-                'User-Agent': 'Mozilla/4.0 (compatible; MSIE5.01; Windows NT)',
-                'Host': 'www.tutorialspoint.com',
-                'Accept-Language': 'en-us',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'Keep-Alive'
+                'user-agent': 'Mozilla/4.0 (compatible; MSIE5.01; Windows NT)',
+                'host': 'www.tutorialspoint.com',
+                'accept-language': 'en-us',
+                'accept-encoding': 'gzip, deflate',
+                'connection': 'Keep-Alive'
             },
             "body": ""
         }
@@ -54,11 +54,11 @@ http_examples = [
             "request_uri": "/hello.htm?limit=30&start=40",
             "http_version": "HTTP1",
             "headers": {
-                'User-Agent': 'Mozilla/4.0 (compatible; MSIE5.01; Windows NT)',
-                'Host': 'www.tutorialspoint.com',
-                'Accept-Language': 'en-us',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'Keep-Alive'
+                'user-agent': 'Mozilla/4.0 (compatible; MSIE5.01; Windows NT)',
+                'host': 'www.tutorialspoint.com',
+                'accept-language': 'en-us',
+                'accept-encoding': 'gzip, deflate',
+                'connection': 'Keep-Alive'
             },
             "body": ""
         }
