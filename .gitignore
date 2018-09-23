@@ -331,3 +331,5 @@ ASALocalRun/
 .cache/
 venv/
 .pytest_cache/
+.vscode
+src/**/lib

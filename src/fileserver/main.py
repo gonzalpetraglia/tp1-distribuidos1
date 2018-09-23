@@ -15,9 +15,9 @@ s.listen(5)
 while True:
     c, addr = s.accept()
     message_length = int.from_bytes(c.recv(8), byteorder='big', signed=True)
-    print (message_length)
+    #print (message_length)
     message = c.recv(message_length)
-    print (message)
+    # print (message)
     c.close()
     request_dict = pickle.loads(message)
     response_dict = {

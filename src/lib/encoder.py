@@ -6,7 +6,6 @@ import math
 
 MAX_MESSAGE_LENGTH_IN_BYTES = 2 ** (64)
 
-
 def encode_socket(obj):
     buf = StringIO()
     return bytes(ForkingPickler.dumps(obj))
@@ -19,7 +18,7 @@ def decode_response(response_bytes):
 def encode_request(client_socket, method, URI_postfix, body=None):
     max_bytes_needed_to_encode_length = int(math.log(MAX_MESSAGE_LENGTH_IN_BYTES, 2) / 8)
     # TODO add info about client
-    print (body)
+    # print (body)
     info_to_server = {
         "client": encode_socket(client_socket),
         "method": method,
@@ -28,7 +27,7 @@ def encode_request(client_socket, method, URI_postfix, body=None):
     if body:
         info_to_server['body'] = body
     message_to_fileserver = pickle.dumps(info_to_server)
-    print(message_to_fileserver)
+    # print(message_to_fileserver)
     return len(message_to_fileserver).to_bytes(max_bytes_needed_to_encode_length, byteorder='big', signed=True) \
             + message_to_fileserver
 
