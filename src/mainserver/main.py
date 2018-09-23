@@ -79,7 +79,7 @@ def validate_request(parsed_request):
     if (method in ['POST', 'PUT'] and  content_length > MAX_MESSAGE_LENGTH_IN_BYTES):
         raise BodyTooLong()
 
-    if (method in ['POST', 'PUT'] and (not content_type or 'application/json' in content_type)):
+    if (method in ['POST', 'PUT'] and (not content_type or 'application/json' not in content_type)):
         raise BodyNotJSON()
 
     request_uri = parsed_request['request_uri']
@@ -123,29 +123,45 @@ def treat_message(msg, client_socket):
 
 
 def http_respond(incoming_fileserver_responses_socket):
-    fileserver_response_socket, address = incoming_fileserver_responses_socket.accept()
-    response_length_encoded = fileserver_response_socket.recv(8)
-    response_length = int.from_bytes(response_length_encoded, byteorder='big', signed=True)
-    # print (response_length)
+    try:
+        while True:
+            fileserver_response_socket, address = incoming_fileserver_responses_socket.accept()
+            response_length_encoded = fileserver_response_socket.recv(8)
+            response_length = int.from_bytes(response_length_encoded, byteorder='big', signed=True)
+            # print (response_length)
 
-    response = fileserver_response_socket.recv(response_length)
-    client_socket, status_code, body = decode_response(response)
-    status_code_message = STATUS_CODE_MESSAGES[status_code]
-    # sockets_to_be_closed.put(client_socket)
-    http_response = 'HTTP/1.1 {} {}\n'.format(status_code, status_code_message) + \
-                    'Date: {}\n'.format(datetime.utcnow())+\
-                    'Server: JSON-SERVER v1.0.0\n'+\
-                    'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\n'+\
-                    'Content-Length: {}\n'.format(len(body))+\
-                    'Content-Type: application/json\n'+\
-                    'Connection: Closed\n\n'+\
-                    '{}'.format(body)
-    # print (http_response)
-    client_socket.send(http_response.encode())
-    print ("Done responding user, going to close the socket")
-    client_socket.close()
-    # TODO: Send log to logger
-
+            response = fileserver_response_socket.recv(response_length)
+            client_socket, status_code, body = decode_response(response)
+            status_code_message = STATUS_CODE_MESSAGES[status_code]
+            # sockets_to_be_closed.put(client_socket)
+            http_response = 'HTTP/1.1 {} {}\n'.format(status_code, status_code_message) + \
+                            'Date: {}\n'.format(datetime.utcnow())+\
+                            'Server: JSON-SERVER v1.0.0\n'+\
+                            'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\n'+\
+                            'Content-Length: {}\n'.format(len(body))+\
+                            'Content-Type: application/json\n'+\
+                            'Connection: Closed\n\n'+\
+                            '{}\n\n'.format(body)
+            # print (http_response)
+            client_socket.send(http_response.encode())
+            print ("Done responding user, going to close the socket")
+            client_socket.close()
+            # TODO: Send log to logger
+    except Exception:
+        print (traceback.format_exc())
+        http_response = 'HTTP/1.1 {} {}\n'.format(500, "Internal Error") + \
+                        'Date: {}\n'.format(datetime.utcnow())+\
+                        'Server: JSON-SERVER v1.0.0\n'+\
+                        'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\n'+\
+                        'Content-Length: {}\n'.format(len('{"status": "unknown_error"}'))+\
+                        'Content-Type: application/json\n'+\
+                        'Connection: Closed\n\n'+\
+                        '{"status": "unknown_error"}'
+        # print (http_response)
+        client_socket.send(http_response.encode())
+        print ("Done responding user, going to close the socket")
+        client_socket.close()
+    incoming_fileserver_responses_socket.close()
 def http_process(accepted_clients_queue):
     while True:
         try:
