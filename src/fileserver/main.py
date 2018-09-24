@@ -11,7 +11,7 @@ from threading import Thread, Condition, Lock
 from cache_lru import ProtectedLRUCache
 
 
-FORMAT = "%(asctime)-15s %(message)s"
+FORMAT = "%(asctime)-15s %(thread)d %(message)s"
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('fileserver')
 logger.setLevel(logging.DEBUG)
@@ -60,12 +60,12 @@ def treat_request(request_dict, cache):
         response = get(filename, cache)
     elif method == 'PUT':
         content = request_dict['body']
-        response = put(filename, content)
+        response = put(filename, content, cache)
     elif method == 'POST':
         content = request_dict['body']
-        response = post(filename, content)
+        response = post(filename, content, cache)
     elif method == 'DELETE':
-        response = delete(filename)
+        response = delete(filename, cache)
     else:
         raise InternalMethodNotSupported
 
@@ -76,9 +76,13 @@ def get(filename, cache):
     orchestrator.lock_shared(filename)
     try:
         response = cache.get(filename)
+        logger.debug('Hit cache ' + filename)
     except KeyError:    
+        logger.debug('Miss cache ' + filename)
+
         with open(os.path.join(FILES_FOLDER, filename), 'r') as request_file:
             response = request_file.read()
+        cache.set(filename, response)
     
     orchestrator.unlock(filename)
     return response
