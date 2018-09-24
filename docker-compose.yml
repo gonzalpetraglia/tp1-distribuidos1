@@ -7,10 +7,8 @@ services:
       context: ./
     volumes:
       - ./files:/files
-      - ./logs:/logs
     environment:
       - FILES_FOLDER="/files"
-      - LOGFILE="/logs/logs"
     env_file:
       - ./docker-variables.env
     networks:
@@ -23,6 +21,12 @@ services:
       - "8080:8080"
     env_file:
       - ./docker-variables.env
+    volumes:
+      - ./logs:/logs
+    environment:
+      - LOGFILE="/logs/logs"
+      - NUMBER_OF_RESPONDERS=20
+      - NUMBER_OF_PROCESSERS=30
     networks:
       - files
     links:
