@@ -3,12 +3,12 @@ import pickle
 import os
 import json
 from lib.encoder import encode_response
-from config import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS
+from config import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY
 import portalocker
 import traceback
 import logging
 from threading import Thread, Condition, Lock
-
+from cache_lru import ProtectedLRUCache
 
 
 FORMAT = "%(asctime)-15s %(message)s"
@@ -43,12 +43,12 @@ class Orchestrator(object):
             if self.file_locks[filename]["exclusive"] or self.file_locks[filename]["threads_with_lock"] == 1:
                 self.file_locks.pop(filename)
             else:
-                self.file_locks["threads_with_lock"] -= 1
+                self.file_locks[filename]["threads_with_lock"] -= 1
             self.is_free_to_go.notify_all()
 
 orchestrator = Orchestrator()
 
-def treat_request(request_dict):
+def treat_request(request_dict, cache):
     method = request_dict['method']
     filename = request_dict['URI_postfix'][1:] # Remove the first /
     logger.info("Going to execute " + method + " to " + os.path.join(FILES_FOLDER, filename))
@@ -57,7 +57,7 @@ def treat_request(request_dict):
         raise FolderDoesntExist()
     
     if method == 'GET':
-        response = get(filename)
+        response = get(filename, cache)
     elif method == 'PUT':
         content = request_dict['body']
         response = put(filename, content)
@@ -72,34 +72,41 @@ def treat_request(request_dict):
     logger.info('Finished {} on {}: {}...'.format(method, filename, response[:20]))
     return response
     
-def get(filename):
+def get(filename, cache):
     orchestrator.lock_shared(filename)
-    with open(os.path.join(FILES_FOLDER, filename), 'r') as request_file:
-        response = request_file.read()
+    try:
+        response = cache.get(filename)
+    except KeyError:    
+        with open(os.path.join(FILES_FOLDER, filename), 'r') as request_file:
+            response = request_file.read()
+    
     orchestrator.unlock(filename)
     return response
 
-def put(filename, content):
+def put(filename, content, cache):
     orchestrator.lock_exclusive(filename)
     if not os.path.isfile(os.path.join(FILES_FOLDER, filename)):
         raise FileNotFoundError()
     with open(os.path.join(FILES_FOLDER, filename), 'w') as request_file:
         request_file.write(content)
+    cache.set(filename, content)
     orchestrator.unlock(filename)
     return json.dumps({"status":"ok"})
 
-def post(filename, content):
+def post(filename, content, cache):
     orchestrator.lock_exclusive(filename)
     os.makedirs(os.path.dirname(os.path.join(FILES_FOLDER, filename)), exist_ok=True)
     with open(os.path.join(FILES_FOLDER, filename), 'x') as request_file:
         request_file.write(content)
+    cache.set(filename, content)
     orchestrator.unlock(filename)
     return json.dumps({"status":"ok", "id": filename})
 
 
-def delete(filename):
+def delete(filename, cache):
     orchestrator.lock_exclusive(filename)
     os.remove(os.path.join(FILES_FOLDER, filename))
+    cache.remove(filename)
     orchestrator.unlock(filename)
     return json.dumps({"status":"ok"})
 
@@ -108,7 +115,7 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(('127.0.0.1', FILESERVERS_PORTS))
 s.listen(5)
 
-def fileserver_responder():
+def fileserver_responder(cache):
     while True:
         try:
             c, addr = s.accept()
@@ -118,7 +125,7 @@ def fileserver_responder():
             # print (message)
             c.close()
             request_dict = pickle.loads(message)
-            response = treat_request(request_dict)
+            response = treat_request(request_dict, cache)
             status_code = 200
             
         except FileExistsError:
@@ -149,7 +156,9 @@ def fileserver_responder():
         responses_queue_socket.send(response_encoded)
         responses_queue_socket.close()
 
-workers = [Thread(target=fileserver_responder) for i in range(FILESERVER_WORKERS)]
+cache = ProtectedLRUCache(CACHE_CAPACITY)
+
+workers = [Thread(target=fileserver_responder, args=(cache,)) for i in range(FILESERVER_WORKERS)]
 
 for worker in workers:
     worker.start()

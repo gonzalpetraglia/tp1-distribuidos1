@@ -1,6 +1,6 @@
 import socket
 import time
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 from threading import Thread
 import http_parser
 import pickle
@@ -174,6 +174,8 @@ def log_loop(logs_queue):
 
 accepted_clients_queue = Queue()
 logs_queue = Queue()
+
+
 
 fileserver_responses_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
