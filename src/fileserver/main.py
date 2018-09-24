@@ -114,10 +114,6 @@ def delete(filename, cache):
     orchestrator.unlock(filename)
     return json.dumps({"status":"ok"})
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-s.bind(('127.0.0.1', FILESERVERS_PORTS))
-s.listen(5)
 
 def fileserver_responder(cache):
     while True:
@@ -160,12 +156,19 @@ def fileserver_responder(cache):
         responses_queue_socket.send(response_encoded)
         responses_queue_socket.close()
 
-cache = ProtectedLRUCache(CACHE_CAPACITY)
+if __name__ == "__main__":
 
-workers = [Thread(target=fileserver_responder, args=(cache,)) for i in range(FILESERVER_WORKERS)]
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-for worker in workers:
-    worker.start()
+    s.bind(('0.0.0.0', FILESERVERS_PORTS))
+    s.listen(5)
 
-for worker in workers:
-    worker.join()
+    cache = ProtectedLRUCache(CACHE_CAPACITY)
+
+    workers = [Thread(target=fileserver_responder, args=(cache,)) for i in range(FILESERVER_WORKERS)]
+
+    for worker in workers:
+        worker.start()
+
+    for worker in workers:
+        worker.join()

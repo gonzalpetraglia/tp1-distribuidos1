@@ -10,6 +10,7 @@ from lib.encoder import encode_response, encode_request, decode_response, MAX_ME
 import uuid
 import traceback
 import logging
+import os
 from datetime import datetime
 from config import NUMBER_OF_FILESERVERS, NUMBER_OF_FILESERVERS, NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, VALID_POST_URI_REGEX, VALID_PUT_GET_DELETE_URI_REGEX, STATUS_CODE_MESSAGES, FILESERVERS_PORTS, FILESERVER_NAME, FILESERVER_PREFIX, LOGFILE
 from exceptions import BadRequestError, BodyTooLong, BodyNotJSON, MethodNotSupported, InvalidURI, MissingBody
@@ -37,13 +38,14 @@ def send_response_error(status_code, message, client_socket, request_uri, method
     responses_queue_socket.close()
 
 def calculate_fileserver(URI_postfix):
-    return int(md5(URI_postfix.encode()).hexdigest(), 16) % NUMBER_OF_FILESERVERS
+    return int(md5(URI_postfix.encode()).hexdigest(), 16) % NUMBER_OF_FILESERVERS + 1
 
 def get_fileserver_address(fileserver_index):
     if FILESERVER_NAME: # Intended for localhost tests
         fileserver_name = FILESERVER_NAME
     else:
         fileserver_name = FILESERVER_PREFIX + str(fileserver_index)
+    logger.debug('FILESERVER: {}:{}'.format(fileserver_name, FILESERVERS_PORTS))
     return fileserver_name, FILESERVERS_PORTS
 
 def validate_request(parsed_request):
@@ -148,9 +150,11 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
 def http_process(accepted_clients_queue):
     while True:
         try:
+            logger.debug('Waiting for a new client')
             sock, address = accepted_clients_queue.get()
             chunk  = '' # TODO Dont have everything on memory
             breaks_found = 0
+            logger.info('Going to read from socket from new client')
             chunk += sock.recv(2048).decode()
             treat_message(chunk, sock)
 
@@ -159,6 +163,7 @@ def http_process(accepted_clients_queue):
             send_response_error(500, 'unknown_error', sock, "couldnt_parse_uri", "couldnt_parse_method")
 
 def log_loop(logs_queue):
+    os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)
     with open(LOGFILE, 'a') as logfile:
         while True:
             try:
@@ -172,39 +177,45 @@ def log_loop(logs_queue):
             except Exception:
                 logger.error(traceback.format_exc())
 
-accepted_clients_queue = Queue()
-logs_queue = Queue()
+if __name__ == "__main__":
+    accepted_clients_queue = Queue()
+    logs_queue = Queue()
 
 
 
-fileserver_responses_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    fileserver_responses_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-fileserver_responses_socket.bind(('0.0.0.0', RESPONSES_PORT))
-fileserver_responses_socket.listen(5)
-
-
-processers = [Process(target=http_process, args=(accepted_clients_queue,)) for i in range(NUMBER_OF_PROCESSERS)]
-responders = [Process(target=http_respond, args=(fileserver_responses_socket, logs_queue,)) for i in range(NUMBER_OF_RESPONDERS)]
-logger_process = Process(target=log_loop, args=(logs_queue,))
-
-for processer in processers:
-    processer.start()
-for responder in responders:
-    responder.start()
-logger_process.start()
+    fileserver_responses_socket.bind(('0.0.0.0', RESPONSES_PORT))
+    fileserver_responses_socket.listen(5)
 
 
-incoming_clients_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-incoming_clients_socket.bind(('0.0.0.0', REQUESTS_PORT))
-incoming_clients_socket.listen(5)
+    processers = [Process(target=http_process, args=(accepted_clients_queue,)) for i in range(NUMBER_OF_PROCESSERS)]
+    responders = [Process(target=http_respond, args=(fileserver_responses_socket, logs_queue,)) for i in range(NUMBER_OF_RESPONDERS)]
+    logger_process = Process(target=log_loop, args=(logs_queue,))
 
-while True:
-    accepted_client = incoming_clients_socket.accept()
-    accepted_clients_queue.put(accepted_client)
+    logger.info("Going to start {} processers and {} responders ".format(NUMBER_OF_PROCESSERS, NUMBER_OF_RESPONDERS))
 
-for processer in processers:
-    processer.join()
-for responder in responders:
-    responder.join()
-logger_process.join()
+    for processer in processers:
+        processer.start()
+    for responder in responders:
+        responder.start()
+    logger_process.start()
+
+
+    incoming_clients_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    incoming_clients_socket.bind(('0.0.0.0', REQUESTS_PORT))
+    incoming_clients_socket.listen(5)
+
+    while True:
+        logger.debug('Listening for more clients')
+
+        accepted_client = incoming_clients_socket.accept()
+        logger.info('Accepted new client')
+        accepted_clients_queue.put(accepted_client)
+
+    for processer in processers:
+        processer.join()
+    for responder in responders:
+        responder.join()
+    logger_process.join()
 
