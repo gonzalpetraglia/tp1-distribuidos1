@@ -98,7 +98,7 @@ def fileserver_responder(cache):
     while True:
         try:
             c, addr = s.accept()
-            message_length = int.from_bytes(c.recv(8), byteorder='big', signed=True)
+            message_length = int.from_bytes(c.recv(4), byteorder='big', signed=True)
             #print (message_length)
             message = c.recv(message_length)
             # print (message)

@@ -11,6 +11,7 @@ logger.setLevel(logging.DEBUG)
 
 def log_loop(logs_queue):
     os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)
+    logger.info('Going to log into {}'.format(LOGFILE))
     with open(LOGFILE, 'a') as logfile:
         while True:
             try:

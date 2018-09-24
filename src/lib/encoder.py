@@ -4,7 +4,7 @@ from multiprocessing.reduction import ForkingPickler
 from io import StringIO
 import math
 
-MAX_MESSAGE_LENGTH_IN_BYTES = 2 ** (64)
+MAX_MESSAGE_LENGTH_IN_BYTES = 2 ** (32)
 
 def encode_socket(obj):
     buf = StringIO()
@@ -33,5 +33,5 @@ def encode_request(client_socket, method, URI_postfix, body=None):
 
 def encode_response(response_dict):
     response = pickle.dumps(response_dict)
-    return len(response).to_bytes(8, byteorder='big', signed=True) +\
+    return len(response).to_bytes(4, byteorder='big', signed=True) +\
                 response

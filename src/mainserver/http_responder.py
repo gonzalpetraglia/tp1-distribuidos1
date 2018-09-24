@@ -21,7 +21,7 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
     try:
         while True:
             fileserver_response_socket, address = incoming_fileserver_responses_socket.accept()
-            response_length_encoded = fileserver_response_socket.recv(8)
+            response_length_encoded = fileserver_response_socket.recv(4)
             response_length = int.from_bytes(response_length_encoded, byteorder='big', signed=True)
 
             response = fileserver_response_socket.recv(response_length)
