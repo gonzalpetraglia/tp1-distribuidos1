@@ -5,51 +5,30 @@ from threading import Thread
 import http_parser
 import pickle
 from hashlib import md5
-import os
-import re
 import json
 from lib.encoder import encode_response, encode_request, decode_response, MAX_MESSAGE_LENGTH_IN_BYTES, encode_socket
 import uuid
 import traceback
+import logging
 from datetime import datetime
-
-NUMBER_OF_FILESERVERS = int(os.environ['NUMBER_OF_FILESERVERS'])
-NUMBER_OF_RESPONDERS = int(os.environ.get('NUMBER_OF_RESPONDERS', 10))
-NUMBER_OF_PROCESSERS = int(os.environ.get('NUMBER_OF_PROCESSERS', 10))
-REQUESTS_PORT = int(os.environ.get('REQUESTS_PORT', 8080))
-RESPONSES_PORT = int(os.environ.get('RESPONSES_PORT', 8090))
-VALID_POST_URI_REGEX = re.compile('^/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$')
-VALID_PUT_GET_DELETE_URI_REGEX = re.compile('^/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$')
-STATUS_CODE_MESSAGES = {
-    200: "OK",
-    400: "Bad Request",
-    500: "Internal Error",
-    404: "Not Found"
-}
+from config import NUMBER_OF_FILESERVERS, NUMBER_OF_FILESERVERS, NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, VALID_POST_URI_REGEX, VALID_PUT_GET_DELETE_URI_REGEX, STATUS_CODE_MESSAGES, FILESERVERS_PORTS, FILESERVER_NAME, FILESERVER_PREFIX, LOGFILE
+from exceptions import BadRequestError, BodyTooLong, BodyNotJSON, MethodNotSupported, InvalidURI, MissingBody
 
 
 
-class BodyTooLong(Exception):
-    pass
+FORMAT = "%(asctime)-15s %(process)d %(message)s"
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger('mainserver')
+logger.setLevel(logging.DEBUG)
+logger.info("Mainserver is up and running :)")
 
-class BodyNotJSON(Exception):
-    pass
-
-class InvalidURI(Exception):
-    pass
-
-class MethodNotSupported(Exception):
-    pass
-
-class MissingBody(Exception):
-    pass
-
-
-def send_response_error(status_code, message, client_socket):
+def send_response_error(status_code, message, client_socket, request_uri, method):
     response_dict = {
         "status_code": status_code,
         "body": json.dumps({"status": message}),
-        "client": encode_socket(client_socket)
+        "client": encode_socket(client_socket),
+        "request_uri": request_uri,
+        "method": method
     }
     response_encoded = encode_response(response_dict)
     responses_queue_socket = socket.socket()
@@ -61,18 +40,24 @@ def calculate_fileserver(URI_postfix):
     return int(md5(URI_postfix.encode()).hexdigest(), 16) % NUMBER_OF_FILESERVERS
 
 def get_fileserver_address(fileserver_index):
-    return '127.0.0.1', 9000 + fileserver_index
+    if FILESERVER_NAME: # Intended for localhost tests
+        fileserver_name = FILESERVER_NAME
+    else:
+        fileserver_name = FILESERVER_PREFIX + str(fileserver_index)
+    return fileserver_name, FILESERVERS_PORTS
 
 def validate_request(parsed_request):
     method = parsed_request['method']
+    request_uri = parsed_request['request_uri']
+
+    content_length = int(parsed_request['headers'].get('content-length', 0))
+
+    content_type = parsed_request['headers'].get('content-type', None)
+    logger.info('Going to validate {} {} {} {}'.format(method, request_uri, content_length, content_type))
 
     if method not in ['POST', 'PUT', 'DELETE', 'GET']:
         raise MethodNotSupported()
     
-    content_length = int(parsed_request['headers'].get('content-length', 0))
-
-    content_type = parsed_request['headers'].get('content-type', None)
-    print (method, content_length, content_type)
     if (method in ['POST', 'PUT'] and not content_length):
         raise MissingBody()
 
@@ -81,8 +66,6 @@ def validate_request(parsed_request):
 
     if (method in ['POST', 'PUT'] and (not content_type or 'application/json' not in content_type)):
         raise BodyNotJSON()
-
-    request_uri = parsed_request['request_uri']
     
     if method == 'POST' and not VALID_POST_URI_REGEX.match(request_uri):
         raise InvalidURI()
@@ -93,62 +76,61 @@ def validate_request(parsed_request):
 
 def treat_message(msg, client_socket):
     try:
-        # print(msg)
         parsed_request = http_parser.parse_http(msg)
-        validate_request(parsed_request)
         method = parsed_request['method']
-        
-        body = parsed_request['body'] if method in ['POST', 'PUT'] else None
-        parsed_request['request_uri'] = parsed_request['request_uri'] + '/' + str(uuid.uuid4()) if method == 'POST' else parsed_request['request_uri']
-        fileserver_index = calculate_fileserver(parsed_request['request_uri'])
-        message = encode_request(client_socket, parsed_request["method"], parsed_request["request_uri"], body)
+        request_uri = parsed_request['request_uri']
+        validate_request(parsed_request)
 
+        body = parsed_request['body'] if method in ['POST', 'PUT'] else None
+        request_uri = request_uri + '/' + str(uuid.uuid4()) if method == 'POST' else request_uri
+        fileserver_index = calculate_fileserver(request_uri)
+        message = encode_request(client_socket, method, request_uri, body)
         sock_fileserver = socket.socket()
         sock_fileserver.connect(get_fileserver_address(fileserver_index))
         sock_fileserver.send(message)
         sock_fileserver.close()
-    except BodyTooLong:
-        send_response_error(400, 'body_too_long', client_socket)
-    except BodyNotJSON:
-        send_response_error(400, 'body_not_json', client_socket)
-    except MethodNotSupported:
-        send_response_error(400, 'method_not_supported', client_socket)
-    except InvalidURI:
-        send_response_error(400, 'invalid_uri', client_socket)
-    except MissingBody:
-        send_response_error(400, 'missing_body', client_socket)
+    except BadRequestError as e:
+        error_message = e.get_error_message()
+        logger.warn('Bad request: ' + error_message)
+        send_response_error(400, error_message, client_socket, request_uri, method)
     except Exception:
-        print (traceback.format_exc())
-        send_response_error(500, 'unknown_error', client_socket)
+        logger.error(traceback.format_exc())
+        send_response_error(500, 'unknown_error', client_socket, request_uri, method)
 
 
-def http_respond(incoming_fileserver_responses_socket):
+def send_log(queue, method, status_code, request_uri):
+    queue.put({
+        "method": method,
+        "status_code": status_code,
+        "request_uri": request_uri
+    })
+
+def http_respond(incoming_fileserver_responses_socket, logs_queue):
     try:
         while True:
             fileserver_response_socket, address = incoming_fileserver_responses_socket.accept()
             response_length_encoded = fileserver_response_socket.recv(8)
             response_length = int.from_bytes(response_length_encoded, byteorder='big', signed=True)
-            # print (response_length)
 
             response = fileserver_response_socket.recv(response_length)
-            client_socket, status_code, body = decode_response(response)
+            client_socket, status_code, body, request_uri, method = decode_response(response)
+            logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
+
             status_code_message = STATUS_CODE_MESSAGES[status_code]
-            # sockets_to_be_closed.put(client_socket)
             http_response = 'HTTP/1.1 {} {}\n'.format(status_code, status_code_message) + \
                             'Date: {}\n'.format(datetime.utcnow())+\
                             'Server: JSON-SERVER v1.0.0\n'+\
                             'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\n'+\
-                            'Content-Length: {}\n'.format(len(body))+\
+                            'Content-Length: {}\n'.format(len(body)+2)+\
                             'Content-Type: application/json\n'+\
                             'Connection: Closed\n\n'+\
                             '{}\n\n'.format(body)
-            # print (http_response)
             client_socket.send(http_response.encode())
-            print ("Done responding user, going to close the socket")
+            logger.info("Done responding user, going to close the socket")
             client_socket.close()
-            # TODO: Send log to logger
+            send_log(logs_queue, method, status_code, request_uri)
     except Exception:
-        print (traceback.format_exc())
+        logger.error(traceback.format_exc())
         http_response = 'HTTP/1.1 {} {}\n'.format(500, "Internal Error") + \
                         'Date: {}\n'.format(datetime.utcnow())+\
                         'Server: JSON-SERVER v1.0.0\n'+\
@@ -157,60 +139,61 @@ def http_respond(incoming_fileserver_responses_socket):
                         'Content-Type: application/json\n'+\
                         'Connection: Closed\n\n'+\
                         '{"status": "unknown_error"}'
-        # print (http_response)
         client_socket.send(http_response.encode())
-        print ("Done responding user, going to close the socket")
+        logger.info("Done responding user, going to close the socket")
         client_socket.close()
     incoming_fileserver_responses_socket.close()
+
+
 def http_process(accepted_clients_queue):
     while True:
         try:
             sock, address = accepted_clients_queue.get()
             chunk  = '' # TODO Dont have everything on memory
             breaks_found = 0
-            # print (address)
-            # while breaks_found < 2:
             chunk += sock.recv(2048).decode()
-                # breaks_found += chunk.count('\n\n') # TODO: Malformed requests?
             treat_message(chunk, sock)
 
         except Exception:
-            print (traceback.format_exc())
-            send_response_error(500, 'unknown_error', sock)
+            logger.error(traceback.format_exc())
+            send_response_error(500, 'unknown_error', sock, "couldnt_parse_uri", "couldnt_parse_method")
 
-# def close_sockets():
-#     while True:
-#         print("Waiting for another socket")
-#         socket_to_be_closed = sockets_to_be_closed.get()
-#         print("Closing socket")
-#         socket_to_be_closed.close()
+def log_loop(logs_queue):
+    with open(LOGFILE, 'a') as logfile:
+        while True:
+            try:
+                log_dict = logs_queue.get()
+                method = log_dict['method']
+                request_uri = log_dict['request_uri']
+                status_code = log_dict['status_code']
+
+                logfile.write("{} {} {}\n".format(method, request_uri, status_code))
+                logfile.flush()
+            except Exception:
+                logger.error(traceback.format_exc())
 
 accepted_clients_queue = Queue()
+logs_queue = Queue()
 
 fileserver_responses_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-fileserver_responses_socket.bind(('127.0.0.1', RESPONSES_PORT))
+fileserver_responses_socket.bind(('0.0.0.0', RESPONSES_PORT))
 fileserver_responses_socket.listen(5)
 
 
 processers = [Process(target=http_process, args=(accepted_clients_queue,)) for i in range(NUMBER_OF_PROCESSERS)]
-responders = [Process(target=http_respond, args=(fileserver_responses_socket,)) for i in range(NUMBER_OF_RESPONDERS)]
-
-
-# sockets_to_be_closed = Queue()
-
-# sockets_closer = Thread(target=close_sockets)
-# sockets_closer.start()
+responders = [Process(target=http_respond, args=(fileserver_responses_socket, logs_queue,)) for i in range(NUMBER_OF_RESPONDERS)]
+logger_process = Process(target=log_loop, args=(logs_queue,))
 
 for processer in processers:
     processer.start()
-
 for responder in responders:
     responder.start()
+logger_process.start()
+
 
 incoming_clients_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-incoming_clients_socket.bind(('127.0.0.1', REQUESTS_PORT))
+incoming_clients_socket.bind(('0.0.0.0', REQUESTS_PORT))
 incoming_clients_socket.listen(5)
 
 while True:
@@ -219,8 +202,7 @@ while True:
 
 for processer in processers:
     processer.join()
-
 for responder in responders:
     responder.join()
+logger_process.join()
 
-# sockets_closer.join()

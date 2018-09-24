@@ -3,11 +3,21 @@ import pickle
 import os
 import json
 from lib.encoder import encode_response
-from config import FILES_FOLDER
+from config import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS
 import portalocker
 import traceback
-RESPONSES_PORT = int(os.environ.get('RESPONSES_PORT', 8090))
+import logging
+from threading import Thread, Condition, Lock
 
+
+
+FORMAT = "%(asctime)-15s %(message)s"
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger('fileserver')
+logger.setLevel(logging.DEBUG)
+
+
+logger.info("Fileserver is up and running :)")
 
 class InternalMethodNotSupported(Exception):
     pass
@@ -15,85 +25,134 @@ class InternalMethodNotSupported(Exception):
 class FolderDoesntExist(Exception):
     pass
 
+
+class Orchestrator(object):
+    is_free_to_go = Condition()
+    file_locks = {}
+    def lock_exclusive(self, filename):
+        with self.is_free_to_go:
+            self.is_free_to_go.wait_for(lambda: filename not in self.file_locks)
+            self.file_locks[filename] = {"exclusive": True}
+    def lock_shared(self, filename):
+        with self.is_free_to_go:
+            self.is_free_to_go.wait_for(lambda: filename not in self.file_locks or not self.file_locks[filename]["exclusive"])
+            threads_with_lock = self.file_locks[filename]["threads_with_lock"] if filename in self.file_locks else 0
+            self.file_locks[filename] = {"exclusive": False, "threads_with_lock": threads_with_lock + 1}
+    def unlock(self, filename):
+        with self.is_free_to_go:
+            if self.file_locks[filename]["exclusive"] or self.file_locks[filename]["threads_with_lock"] == 1:
+                self.file_locks.pop(filename)
+            else:
+                self.file_locks["threads_with_lock"] -= 1
+            self.is_free_to_go.notify_all()
+
+orchestrator = Orchestrator()
+
 def treat_request(request_dict):
     method = request_dict['method']
     filename = request_dict['URI_postfix'][1:] # Remove the first /
-    print ("Going to execute " + method + " to " + os.path.join(FILES_FOLDER, filename) )
+    logger.info("Going to execute " + method + " to " + os.path.join(FILES_FOLDER, filename))
     if not os.path.isdir(FILES_FOLDER):
-        print ('File directory doesnt exist')
+        logger.error('File directory doesnt exist')
         raise FolderDoesntExist()
     
     if method == 'GET':
-        return get(filename)
+        response = get(filename)
     elif method == 'PUT':
         content = request_dict['body']
-        put(filename, content)
+        response = put(filename, content)
     elif method == 'POST':
         content = request_dict['body']
-        post(filename, content)
+        response = post(filename, content)
     elif method == 'DELETE':
-        delete(filename)
+        response = delete(filename)
     else:
         raise InternalMethodNotSupported
 
-
-# TODO this assumes, there is only one process doing this
+    logger.info('Finished {} on {}: {}...'.format(method, filename, response[:20]))
+    return response
+    
 def get(filename):
-    with portalocker.Lock(os.path.join(FILES_FOLDER, filename), mode='r', flags=portalocker.LOCK_SH) as request_file:
-        return request_file.read()
+    orchestrator.lock_shared(filename)
+    with open(os.path.join(FILES_FOLDER, filename), 'r') as request_file:
+        response = request_file.read()
+    orchestrator.unlock(filename)
+    return response
 
 def put(filename, content):
-    with portalocker.Lock(os.path.join(FILES_FOLDER, filename), mode='w', flags=portalocker.LOCK_EX) as request_file:
+    orchestrator.lock_exclusive(filename)
+    if not os.path.isfile(os.path.join(FILES_FOLDER, filename)):
+        raise FileNotFoundError()
+    with open(os.path.join(FILES_FOLDER, filename), 'w') as request_file:
         request_file.write(content)
+    orchestrator.unlock(filename)
+    return json.dumps({"status":"ok"})
 
 def post(filename, content):
+    orchestrator.lock_exclusive(filename)
     os.makedirs(os.path.dirname(os.path.join(FILES_FOLDER, filename)), exist_ok=True)
-    print(os.path.isdir(os.path.dirname(os.path.join(FILES_FOLDER, filename))))
-    with portalocker.Lock(os.path.join(FILES_FOLDER, filename), mode='x', flags=portalocker.LOCK_EX) as request_file:
+    with open(os.path.join(FILES_FOLDER, filename), 'x') as request_file:
         request_file.write(content)
+    orchestrator.unlock(filename)
+    return json.dumps({"status":"ok", "id": filename})
+
 
 def delete(filename):
-    with portalocker.Lock(os.path.join(FILES_FOLDER, filename), mode='r', flags=portalocker.LOCK_EX) as request_file:
-        os.remove(os.path.join(FILES_FOLDER, filename))
+    orchestrator.lock_exclusive(filename)
+    os.remove(os.path.join(FILES_FOLDER, filename))
+    orchestrator.unlock(filename)
+    return json.dumps({"status":"ok"})
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-s.bind(('127.0.0.1', 9000))
+s.bind(('127.0.0.1', FILESERVERS_PORTS))
 s.listen(5)
 
-while True:
-    try:
-        c, addr = s.accept()
-        message_length = int.from_bytes(c.recv(8), byteorder='big', signed=True)
-        #print (message_length)
-        message = c.recv(message_length)
-        # print (message)
-        c.close()
-        request_dict = pickle.loads(message)
-        response = treat_request(request_dict)
-        status_code = 200
-        
-    except FileExistsError:
-        status_code = 500
-        response = json.dumps({"status": 'retry_please'}) # This should be done automatically by the accepter, changing the URI and sending it back ideally, but it is very rare to happen anyway ( the probability that one users sends a request and this error happens is one in 10^20 asuming 10^18 files already exist)
-    except FileNotFoundError:
-        status_code = 404
-        response = json.dumps({"status": 'file_not_found'})
-    except Exception:
-        status_code = 500
-        response = json.dumps({"status": 'unknown_error'})
-        print (traceback.format_exc())
+def fileserver_responder():
+    while True:
+        try:
+            c, addr = s.accept()
+            message_length = int.from_bytes(c.recv(8), byteorder='big', signed=True)
+            #print (message_length)
+            message = c.recv(message_length)
+            # print (message)
+            c.close()
+            request_dict = pickle.loads(message)
+            response = treat_request(request_dict)
+            status_code = 200
+            
+        except FileExistsError:
+            status_code = 500
+            logger.warn('File existed')
+            response = json.dumps({"status": 'retry_please'}) # This should be done automatically by the accepter, changing the URI and sending it back ideally, but it is very rare to happen anyway ( the probability that one users sends a request and this error happens is one in 10^20 asuming 10^18 files already exist)
+        except FileNotFoundError:
+            status_code = 404
+            logger.warn('File not found')
+            response = json.dumps({"status": 'file_not_found'})
+        except Exception:
+            status_code = 500
+            response = json.dumps({"status": 'unknown_error'})
+            logger.error(traceback.format_exc())
 
-    response = str(response) if response is not None else json.dumps({"status":"ok"})
-    response_dict = {
-        "status_code": status_code,
-        "body": response,
-        "client": request_dict['client'],
-        "request_uri": request_dict['URI_postfix']
-    }
+        response_dict = {
+            "status_code": status_code,
+            "body": response,
+            "client": request_dict['client'],
+            "request_uri": request_dict['URI_postfix'],
+            "method": request_dict['method']
+        }
 
-    response_encoded = encode_response(response_dict)
-    responses_queue_socket = socket.socket()
-    responses_queue_socket.connect(('127.0.0.1', RESPONSES_PORT))
-    responses_queue_socket.send(response_encoded)
-    responses_queue_socket.close()
+
+        response_encoded = encode_response(response_dict)
+        responses_queue_socket = socket.socket()
+        responses_queue_socket.connect((MAINSERVER_NAME, RESPONSES_PORT))
+        responses_queue_socket.send(response_encoded)
+        responses_queue_socket.close()
+
+workers = [Thread(target=fileserver_responder) for i in range(FILESERVER_WORKERS)]
+
+for worker in workers:
+    worker.start()
+
+for worker in workers:
+    worker.join()

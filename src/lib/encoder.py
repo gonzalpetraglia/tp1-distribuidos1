@@ -12,7 +12,7 @@ def encode_socket(obj):
 
 def decode_response(response_bytes):
     response_dict = pickle.loads(response_bytes)
-    return pickle.loads(response_dict['client']), int(response_dict['status_code']), response_dict['body'] 
+    return pickle.loads(response_dict['client']), int(response_dict['status_code']), response_dict['body'], response_dict['request_uri'], response_dict['method']
 
 
 def encode_request(client_socket, method, URI_postfix, body=None):

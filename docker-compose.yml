@@ -1,0 +1,38 @@
+version: "3"
+
+services:
+  file:
+    build: 
+      dockerfile: ./src/fileserver/Dockerfile
+      context: ./
+    volumes:
+      - ./files:/files
+    environment:
+      - FILES_FOLDER="/files"
+    env_file:
+      - ./docker-variables.env
+    ports:
+      - "8070:8070"
+    networks:
+      - files
+
+  main:
+    build: 
+      dockerfile: ./src/mainserver/Dockerfile
+      context: ./
+    ports:
+      - "8080:8080"
+      - "8090:8090"
+    env_file:
+      - ./docker-variables.env
+    networks:
+      - files
+      - logs
+    links:
+      - file
+  
+networks:
+  files:
+    driver: bridge
+  logs:
+    driver: bridge
