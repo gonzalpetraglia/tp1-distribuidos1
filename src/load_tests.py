@@ -11,7 +11,7 @@ def post_get(prefix):
     print (resp)
 
 tic = time.clock()
-p = Pool(10)
+p = Pool(30)
 print(p.map(post_get, ['http://localhost:8080' for i in range(100)]))
 toc = time.clock()
 print (toc - tic)
