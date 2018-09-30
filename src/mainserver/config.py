@@ -1,5 +1,15 @@
 import os
 import re
+import logging
+
+FORMAT = "%(asctime)-15s %(process)d %(message)s"
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger('mainserver')
+logger.setLevel(logging.ERROR)
+
+
+MAX_HEADER_LENGTH = int(os.environ.get('MAX_HEADER_LENGTH', 4096))
+MAX_BODY_LENGTH = 2 ** (32) - 400000 # This should be safer, TODO later
 LOGFILE = os.environ.get('LOGFILE', './logs/logs')
 NUMBER_OF_FILESERVERS = int(os.environ['NUMBER_OF_FILESERVERS'])
 NUMBER_OF_RESPONDERS = int(os.environ.get('NUMBER_OF_RESPONDERS', 10))

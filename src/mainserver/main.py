@@ -1,17 +1,14 @@
 import socket
 import time
 from multiprocessing import Process, Queue, Manager
-import logging
 import os
-from config import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH
+from config import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, \
+        RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, logger
 from http_processer import http_process
 from http_responder import http_respond
 from log_module import log_loop
 
-FORMAT = "%(asctime)-15s %(process)d %(message)s"
-logging.basicConfig(format=FORMAT)
-logger = logging.getLogger('mainserver')
-logger.setLevel(logging.DEBUG)
+
 logger.info("Mainserver is up and running :)")
 
 if __name__ == "__main__":

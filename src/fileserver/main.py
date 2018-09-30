@@ -17,7 +17,7 @@ from orchestrator import Orchestrator
 FORMAT = "%(asctime)-15s %(thread)d %(message)s"
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('fileserver')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.ERROR)
 
 
 logger.info("Fileserver is up and running :)")
@@ -132,7 +132,7 @@ def fileserver_responder(cache):
         response_encoded = encode_response(response_dict)
         responses_queue_socket = socket.socket()
         responses_queue_socket.connect((MAINSERVER_NAME, RESPONSES_PORT))
-        responses_queue_socket.send(response_encoded)
+        responses_queue_socket.sendall(response_encoded)
         responses_queue_socket.close()
 
 if __name__ == "__main__":
