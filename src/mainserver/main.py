@@ -2,12 +2,15 @@ import socket
 import time
 from multiprocessing import Process, Queue, Manager
 import os
-from config import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, \
-        RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, logger
+from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT
 from http_processer import http_process
 from http_responder import http_respond
 from log_module import log_loop
+import logging
 
+logging.basicConfig(format=LOG_FORMAT)
+logger = logging.getLogger('mainserver')
+logger.setLevel(LOG_LEVEL)
 
 logger.info("Mainserver is up and running :)")
 
@@ -44,7 +47,7 @@ if __name__ == "__main__":
         logger.debug('Listening for more clients')
 
         accepted_client = incoming_clients_socket.accept()
-        logger.info('Accepted new client')
+        logger.debug('Accepted new client')
         accepted_clients_queue.put(accepted_client)
 
     for processer in processers:

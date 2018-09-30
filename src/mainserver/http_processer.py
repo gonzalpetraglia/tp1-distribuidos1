@@ -1,13 +1,17 @@
-from exceptions import BadRequestError
+from custom_exceptions import BadRequestError
 from lib.encoder import encode_response, encode_request, decode_response, MAX_MESSAGE_LENGTH_IN_BYTES, encode_socket
 import socket
-from config import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, logger
+from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL
 from hashlib import md5
 import json
 import uuid
 import traceback
 import  http_parser
+import logging
 
+logging.basicConfig(format=LOG_FORMAT)
+logger = logging.getLogger('mainserver')
+logger.setLevel(LOG_LEVEL)
 
 def send_response_error(status_code, message, client_socket, request_uri, method):
     response_dict = {
@@ -47,10 +51,6 @@ def treat_message(parsed_request, client_socket):
         sock_fileserver.connect(get_fileserver_address(fileserver_index))
         sock_fileserver.sendall(message)
         sock_fileserver.close()
-    except BadRequestError as e:
-        error_message = e.get_error_message()
-        logger.warn('Bad request: ' + error_message)
-        send_response_error(400, error_message, client_socket, request_uri, method)
     except Exception:
         logger.error(traceback.format_exc())
         send_response_error(500, 'unknown_error', client_socket, request_uri, method)
@@ -62,9 +62,21 @@ def http_process(accepted_clients_queue):
             logger.debug('Waiting for a new client')
             sock, address = accepted_clients_queue.get()
             logger.info('Going to read from socket from new client')
+            sock.settimeout(5)
             parsed_message = http_parser.read_http_message(lambda x: sock.recv(x).decode())
             treat_message(parsed_message, sock)
-
-        except Exception:
+        except socket.timeout as e:
+            error_message = 'timedout'
+            request_uri = 'couldnt_parse_uri'
+            method = 'coudlnt_parse_method'
+            logger.warn('Timeout on read')
+            send_response_error(400, error_message, sock, request_uri, method)
+        except BadRequestError as e:
+            error_message = e.get_error_message()
+            request_uri = e.get_request_uri()
+            method = e.get_method()
+            logger.warn('Bad request: ' + error_message)
+            send_response_error(400, error_message, sock, request_uri, method)
+        except Exception as e:
             logger.error(traceback.format_exc())
             send_response_error(500, 'unknown_error', sock, "couldnt_parse_uri", "couldnt_parse_method")

@@ -1,0 +1,7 @@
+NUMBER_OF_FILESERVERS=$1
+
+echo "RESPONSES_PORT=8090
+NUMBER_OF_FILESERVERS=$NUMBER_OF_FILESERVERS
+VERBOSITY=2" > docker-varible.env
+
+docker-compose up --scale file=$NUMBER_OF_FILESERVERS --build

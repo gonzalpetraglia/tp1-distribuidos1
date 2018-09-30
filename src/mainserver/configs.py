@@ -2,12 +2,15 @@ import os
 import re
 import logging
 
-FORMAT = "%(asctime)-15s %(process)d %(message)s"
-logging.basicConfig(format=FORMAT)
-logger = logging.getLogger('mainserver')
-logger.setLevel(logging.ERROR)
 
-
+_verbosity_levels = {
+    1: logging.DEBUG,
+    2: logging.INFO,
+    3: logging.WARN,
+    4: logging.ERROR
+}
+LOG_FORMAT = "%(asctime)-15s %(process)d %(message)s"
+LOG_LEVEL = _verbosity_levels[int(os.environ.get('VERBOSITY', 1))]
 MAX_HEADER_LENGTH = int(os.environ.get('MAX_HEADER_LENGTH', 4096))
 MAX_BODY_LENGTH = 2 ** (32) - 400000 # This should be safer, TODO later
 LOGFILE = os.environ.get('LOGFILE', './logs/logs')

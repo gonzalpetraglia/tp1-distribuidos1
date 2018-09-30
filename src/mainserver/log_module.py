@@ -1,13 +1,12 @@
 import os
 import logging
 import traceback
-from config import LOGFILE
+from configs import LOGFILE, LOG_LEVEL, LOG_FORMAT
+import logging
 
-
-FORMAT = "%(asctime)-15s %(process)d %(message)s"
-logging.basicConfig(format=FORMAT)
+logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(LOG_LEVEL)
 
 def log_loop(logs_queue):
     os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)

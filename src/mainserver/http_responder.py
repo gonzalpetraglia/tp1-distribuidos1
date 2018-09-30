@@ -1,7 +1,14 @@
 from lib.encoder import decode_response
 from datetime import datetime
-from config import STATUS_CODE_MESSAGES, logger
+from configs import STATUS_CODE_MESSAGES, LOG_FORMAT, LOG_LEVEL
 import traceback
+import logging
+
+
+logging.basicConfig(format=LOG_FORMAT)
+logger = logging.getLogger('mainserver')
+logger.setLevel(LOG_LEVEL)
+
 
 def send_log(queue, method, status_code, request_uri):
     queue.put({
@@ -29,7 +36,7 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
                             'Content-Length: {}\r\n'.format(len(body)+2)+\
                             'Content-Type: application/json\r\n'+\
                             'Connection: Closed\r\n\r\n'+\
-                            '{}\r\n\r\n'.format(body)
+                            '{}\r\n'.format(body)
             client_socket.sendall(http_response.encode())
             logger.info("Done responding user, going to close the socket")
             client_socket.close()
@@ -40,10 +47,10 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
                             'Date: {}\r\n'.format(datetime.utcnow())+\
                             'Server: JSON-SERVER v1.0.0\r\n'+\
                             'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n'+\
-                            'Content-Length: {}\r\n'.format(len('{"status": "unknown_error"}'))+\
+                            'Content-Length: {}\r\n'.format(len('{"status": "unknown_error"}\r\n'))+\
                             'Content-Type: application/json\r\n'+\
                             'Connection: Closed\r\n\r\n'+\
-                            '{"status": "unknown_error"}\r\n\r\n'
+                            '{"status": "unknown_error"}\r\n'
             client_socket.sendall(http_response.encode())
             logger.info("Done responding user, going to close the socket")
             client_socket.close()
