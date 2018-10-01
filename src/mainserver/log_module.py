@@ -18,8 +18,10 @@ def log_loop(logs_queue):
                 method = log_dict['method']
                 request_uri = log_dict['request_uri']
                 status_code = log_dict['status_code']
+                request_datetime = log_dict['request_datetime']
+                address = log_dict['address']
 
-                logfile.write("{} {} {}\n".format(method, request_uri, status_code))
+                logfile.write("{} {} {} {} {}\n".format(method, request_uri, status_code, request_datetime, address))
                 logfile.flush()
             except Exception:
                 logger.error(traceback.format_exc())

@@ -1,4 +1,4 @@
-from lib.encoder import read_response
+from lib.encoder import read_response, decode_client
 from datetime import datetime
 from configs import STATUS_CODE_MESSAGES, LOG_FORMAT, LOG_LEVEL
 import traceback
@@ -10,18 +10,21 @@ logger = logging.getLogger('mainserver')
 logger.setLevel(LOG_LEVEL)
 
 
-def send_log(queue, method, status_code, request_uri):
+def send_log(queue, method, status_code, request_uri, request_datetime, address):
     queue.put({
         "method": method,
         "status_code": status_code,
-        "request_uri": request_uri
+        "request_uri": request_uri,
+        "address": address,
+        "request_datetime": request_datetime
     })
 
 def http_respond(incoming_fileserver_responses_socket, logs_queue):
     while True:
         try:
             fileserver_response_socket, address = incoming_fileserver_responses_socket.accept()
-            client_socket, status_code, body, request_uri, method = read_response(lambda x: fileserver_response_socket.recv(x))
+            client_info, status_code, body, request_uri, method = read_response(lambda x: fileserver_response_socket.recv(x))
+            client_socket, address, request_datetime = decode_client(client_info)
             client_socket.settimeout(5)
             logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
             logger.debug('Body {}'.format(body))
@@ -36,7 +39,7 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
             client_socket.sendall(http_response.encode())
             logger.info("Done responding user, going to close the socket")
             client_socket.close()
-            send_log(logs_queue, method, status_code, request_uri)
+            send_log(logs_queue, method, status_code, request_uri, request_datetime, address)
         except Exception:
             logger.error(traceback.format_exc())
             http_response = 'HTTP/1.1 {} {}\r\n'.format(500, "Internal Error") + \
