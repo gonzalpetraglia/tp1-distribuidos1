@@ -1,4 +1,13 @@
 import os
+import logging
+_verbosity_levels = {
+    1: logging.DEBUG,
+    2: logging.INFO,
+    3: logging.WARN,
+    4: logging.ERROR
+}
+LOG_FORMAT = "%(asctime)-15s %(process)d %(message)s"
+LOG_LEVEL = _verbosity_levels[int(os.environ.get('VERBOSITY', 1))]
 FILES_FOLDER = os.environ.get('FILES_FOLDER', './files')
 RESPONSES_PORT = int(os.environ.get('RESPONSES_PORT', 8090))
 FILESERVERS_PORTS = int(os.environ.get('FILESERVERS_PORTS', 8070))

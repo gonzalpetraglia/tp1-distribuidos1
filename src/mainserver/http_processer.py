@@ -1,5 +1,5 @@
 from custom_exceptions import BadRequestError
-from lib.encoder import encode_response, encode_request, decode_response, MAX_MESSAGE_LENGTH_IN_BYTES, encode_socket
+from lib.encoder import encode_request, MAX_MESSAGE_LENGTH_IN_BYTES, _encode_socket, encode_response
 import socket
 from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL
 from hashlib import md5
@@ -14,14 +14,7 @@ logger = logging.getLogger('mainserver')
 logger.setLevel(LOG_LEVEL)
 
 def send_response_error(status_code, message, client_socket, request_uri, method):
-    response_dict = {
-        "status_code": status_code,
-        "body": json.dumps({"status": message}),
-        "client": encode_socket(client_socket),
-        "request_uri": request_uri,
-        "method": method
-    }
-    response_encoded = encode_response(response_dict)
+    response_encoded = encode_response(_encode_socket(client_socket), status_code, json.dumps({"status": message}), request_uri, method)
     responses_queue_socket = socket.socket()
     responses_queue_socket.connect(('127.0.0.1', RESPONSES_PORT))
     responses_queue_socket.sendall(response_encoded)

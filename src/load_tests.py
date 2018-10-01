@@ -5,7 +5,7 @@ import time
 
 from large_file import very_large_file
 
-NUMBER_OF_REQUESTS_PER_PROCESS  = 10
+NUMBER_OF_REQUESTS_PER_PROCESS  = 100
 NUMBER_OF_PROCESSES = 10
 PREFIX = 'http://localhost:8080'
 def post_get(params):
@@ -14,7 +14,7 @@ def post_get(params):
         try:
             body = {"jojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojov": "jojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovvvvvjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovvjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojovjojojojojojovvvvvvvvvvvvvvvvvvvvvvvjojojojojojojojojojojojojojojojojojov"}
             resp = requests.post(prefix + '/ok/ok', json=body)
-            assert(resp.status_code == 200)
+            assert(resp.status_code == 201)
             resp = requests.get(prefix + '/' + resp.json()['id'])
             assert(resp.json() == body)
         except Exception as e:

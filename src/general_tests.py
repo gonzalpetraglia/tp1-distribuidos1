@@ -10,10 +10,10 @@ file5 = {"version": 5}
 
 
 r = requests.post(PREFIX + '/ok/ok', json=file1)
-assert(r.status_code == 200)
+assert(r.status_code == 201)
 id1 = r.json()['id']
 r = requests.post(PREFIX + '/ok/ok', json=file2)
-assert(r.status_code == 200)
+assert(r.status_code == 201)
 id2 = r.json()['id']
 print ("Posts done")
 

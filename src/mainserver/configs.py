@@ -28,6 +28,7 @@ VALID_POST_URI_REGEX = re.compile('^/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$')
 VALID_PUT_GET_DELETE_URI_REGEX = re.compile('^/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$')
 STATUS_CODE_MESSAGES = {
     200: "OK",
+    201: "OK",
     400: "Bad Request",
     500: "Internal Error",
     404: "Not Found"

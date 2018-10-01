@@ -1,4 +1,4 @@
-from lib.encoder import decode_response
+from lib.encoder import read_response
 from datetime import datetime
 from configs import STATUS_CODE_MESSAGES, LOG_FORMAT, LOG_LEVEL
 import traceback
@@ -21,11 +21,7 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
     while True:
         try:
             fileserver_response_socket, address = incoming_fileserver_responses_socket.accept()
-            response_length_encoded = fileserver_response_socket.recv(4)
-            response_length = int.from_bytes(response_length_encoded, byteorder='big', signed=True)
-
-            response = fileserver_response_socket.recv(response_length)
-            client_socket, status_code, body, request_uri, method = decode_response(response)
+            client_socket, status_code, body, request_uri, method = read_response(lambda x: fileserver_response_socket.recv(x))
             client_socket.settimeout(5)
             logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
             logger.debug('Body {}'.format(body))

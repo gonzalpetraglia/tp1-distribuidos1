@@ -220,7 +220,7 @@ def cutted_body():
     headers, body = s.recv(4096).decode().split('\r\n\r\n')
     status_code = int(headers.splitlines()[0].split(' ')[1])
     response = json.loads(body)
-    assert (status_code == 200)
+    assert (status_code == 201)
     assert (response['status']  == 'ok')
     _id = response['id']
     response = requests.get(PREFIX + '/' + _id).text

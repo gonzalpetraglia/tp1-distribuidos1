@@ -9,7 +9,7 @@ services:
       - ./files:/files
     environment:
       - FILES_FOLDER=/files
-      - CACHE_CAPACITY=100000
+      - CACHE_CAPACITY=0
     env_file:
       - ./docker-variables.env
     networks:

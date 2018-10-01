@@ -2,8 +2,8 @@ import socket
 import pickle
 import os
 import json
-from lib.encoder import encode_response
-from config import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY
+from lib.encoder import read_request, encode_response
+from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL
 import portalocker
 import traceback
 import logging
@@ -14,10 +14,9 @@ from cache_lru import ProtectedLRUCache
 from orchestrator import Orchestrator
 
 
-FORMAT = "%(asctime)-15s %(thread)d %(message)s"
-logging.basicConfig(format=FORMAT)
+logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('fileserver')
-logger.setLevel(logging.ERROR)
+logger.setLevel(LOG_LEVEL)
 
 
 logger.info("Fileserver is up and running :)")
@@ -30,18 +29,15 @@ class InternalMethodNotSupported(Exception):
 
 orchestrator = Orchestrator()
 
-def treat_request(request_dict, cache):
-    method = request_dict['method']
-    filename = request_dict['URI_postfix'][1:] # Remove the first /
+def treat_request(method, _filename, content, cache):
+    filename = _filename[1:] # Remove the first /, so its not saved in the root directory
     logger.info("Going to execute " + method + " to " + os.path.join(FILES_FOLDER, filename))
     
     if method == 'GET':
         response = get(filename, cache)
     elif method == 'PUT':
-        content = request_dict['body']
         response = put(filename, content, cache)
     elif method == 'POST':
-        content = request_dict['body']
         response = post(filename, content, cache)
     elif method == 'DELETE':
         response = delete(filename, cache)
@@ -64,7 +60,7 @@ def get(filename, cache):
         cache.set(filename, response)
     finally:
         orchestrator.unlock(filename)
-    return response
+    return response, 200
 
 def put(filename, content, cache):
     try:
@@ -76,7 +72,7 @@ def put(filename, content, cache):
         cache.set(filename, content)
     finally:
         orchestrator.unlock(filename)
-    return json.dumps({"status":"ok"})
+    return json.dumps({"status":"ok"}), 200
 
 def post(filename, content, cache):
     orchestrator.lock_exclusive(filename)
@@ -87,7 +83,7 @@ def post(filename, content, cache):
         cache.set(filename, content)
     finally:
         orchestrator.unlock(filename)
-    return json.dumps({"status":"ok", "id": filename})
+    return json.dumps({"status":"ok", "id": filename}), 201
 
 
 def delete(filename, cache):
@@ -97,21 +93,16 @@ def delete(filename, cache):
         cache.remove(filename)
     finally:
         orchestrator.unlock(filename)
-    return json.dumps({"status":"ok"})
+    return json.dumps({"status":"ok"}), 200
 
 
 def fileserver_responder(cache):
     while True:
         try:
             c, addr = s.accept()
-            message_length = int.from_bytes(c.recv(4), byteorder='big', signed=True)
-            #print (message_length)
-            message = c.recv(message_length)
-            # print (message)
+            client, method, uri_postfix, body = read_request(lambda x: c.recv(x))
             c.close()
-            request_dict = pickle.loads(message)
-            response = treat_request(request_dict, cache)
-            status_code = 200
+            response, status_code = treat_request(method, uri_postfix, body, cache)
             
         except FileExistsError:
             status_code = 500
@@ -126,20 +117,16 @@ def fileserver_responder(cache):
             response = json.dumps({"status": 'unknown_error'})
             logger.error(traceback.format_exc())
 
-        response_dict = {
-            "status_code": status_code,
-            "body": response,
-            "client": request_dict['client'],
-            "request_uri": request_dict['URI_postfix'],
-            "method": request_dict['method']
-        }
-
-
-        response_encoded = encode_response(response_dict)
-        responses_queue_socket = socket.socket()
-        responses_queue_socket.connect((MAINSERVER_NAME, RESPONSES_PORT))
-        responses_queue_socket.sendall(response_encoded)
-        responses_queue_socket.close()
+        try:
+            response_encoded = encode_response(client, status_code, response, uri_postfix, method)
+            responses_queue_socket = socket.socket()
+            responses_queue_socket.connect((MAINSERVER_NAME, RESPONSES_PORT))
+            responses_queue_socket.sendall(response_encoded)
+            responses_queue_socket.close()
+            logger.debug('Sent, closing socket')
+        except Exception:
+            logger.warn(traceback.format_exc())
+            logger.warn('WTF')
 
 if __name__ == "__main__":
 
