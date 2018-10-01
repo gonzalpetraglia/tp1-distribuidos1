@@ -3,7 +3,9 @@ from multiprocessing import Process, Pool
 import requests
 import time
 
-NUMBER_OF_REQUESTS_PER_PROCESS  = 1000
+from large_file import very_large_file
+
+NUMBER_OF_REQUESTS_PER_PROCESS  = 10
 NUMBER_OF_PROCESSES = 10
 PREFIX = 'http://localhost:8080'
 def post_get(params):
@@ -44,7 +46,7 @@ def put_parallel():
         for number in numbers:
             if number != initial_number:
                 return False
-
+        print("Everything is ok, process that made it {} ".format(number))
         return True
 
     _id = requests.post(PREFIX + '/ok/ok', json={"replaceable": True}).json()['id']
@@ -62,3 +64,12 @@ def put_parallel():
 
 
 put_parallel()
+
+
+def post_get_large_file():
+    _id = requests.post(PREFIX + '/ok/ok', json=very_large_file).json()['id']
+    response_file = requests.get(PREFIX + '/' + _id).json()
+    assert(response_file == very_large_file)
+    print("Large file well handled")
+
+post_get_large_file()

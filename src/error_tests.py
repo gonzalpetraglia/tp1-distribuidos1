@@ -17,7 +17,6 @@ def invalid_uri_post():
     assert (resp.status_code == 400)
     assert (resp.json()['status'] == 'invalid_uri')
 
-
 def invalid_uri_get():
     resp = requests.get(PREFIX + '/')
     assert (resp.status_code == 400)
@@ -50,7 +49,6 @@ def invalid_uri_delete():
     resp = requests.delete(PREFIX + '/not_ok/not_ok')
     assert (resp.status_code == 400)
     assert (resp.json()['status'] == 'invalid_uri')
-
 
 def body_missing():
     resp = requests.post(PREFIX + '/ok/ok/id')
@@ -112,8 +110,7 @@ def redefined_header_key():
     status_code = int(headers.splitlines()[0].split(' ')[1])
     response = json.loads(body)
     assert (status_code == 400)
-    assert (response['status']  == 'redefined_header_key')
-    
+    assert (response['status']  == 'redefined_header_key')   
 
 def timeout():
     http_request = 'GET /ok/ok/id HTTP/1.1 EXTRA\r\n'+ \
@@ -146,7 +143,7 @@ def malformed_request_line():
     status_code = int(headers.splitlines()[0].split(' ')[1])
     response = json.loads(body)
     assert (status_code == 400)
-    assert (response['status']  == 'malformaed_request_line')
+    assert (response['status']  == 'malformed_request_line')
     
     http_request = 'GET /ok/ok/id\r\n'+ \
         'User-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\r\n'+ \
@@ -163,7 +160,7 @@ def malformed_request_line():
     status_code = int(headers.splitlines()[0].split(' ')[1])
     response = json.loads(body)
     assert (status_code == 400)
-    assert (response['status']  == 'malformaed_request_line')
+    assert (response['status']  == 'malformed_request_line')
     
 def body_too_long():
     http_request = 'POST /ok/ok HTTP/1.1\r\n'+ \
@@ -223,8 +220,6 @@ def cutted_body():
     headers, body = s.recv(4096).decode().split('\r\n\r\n')
     status_code = int(headers.splitlines()[0].split(' ')[1])
     response = json.loads(body)
-    print (status_code)
-    print (response['status'])
     assert (status_code == 200)
     assert (response['status']  == 'ok')
     _id = response['id']

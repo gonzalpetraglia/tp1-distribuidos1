@@ -26,13 +26,13 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
 
             response = fileserver_response_socket.recv(response_length)
             client_socket, status_code, body, request_uri, method = decode_response(response)
+            client_socket.settimeout(5)
             logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
             logger.debug('Body {}'.format(body))
             status_code_message = STATUS_CODE_MESSAGES[status_code]
             http_response = 'HTTP/1.1 {} {}\r\n'.format(status_code, status_code_message) + \
                             'Date: {}\r\n'.format(datetime.utcnow())+\
                             'Server: JSON-SERVER v1.0.0\r\n'+\
-                            'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n'+\
                             'Content-Length: {}\r\n'.format(len(body)+2)+\
                             'Content-Type: application/json\r\n'+\
                             'Connection: Closed\r\n\r\n'+\
@@ -46,7 +46,6 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue):
             http_response = 'HTTP/1.1 {} {}\r\n'.format(500, "Internal Error") + \
                             'Date: {}\r\n'.format(datetime.utcnow())+\
                             'Server: JSON-SERVER v1.0.0\r\n'+\
-                            'Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n'+\
                             'Content-Length: {}\r\n'.format(len('{"status": "unknown_error"}\r\n'))+\
                             'Content-Type: application/json\r\n'+\
                             'Connection: Closed\r\n\r\n'+\

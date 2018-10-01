@@ -62,35 +62,41 @@ def get(filename, cache):
         with open(os.path.join(FILES_FOLDER, filename), 'r') as request_file:
             response = request_file.read()
         cache.set(filename, response)
-    
-    orchestrator.unlock(filename)
+    finally:
+        orchestrator.unlock(filename)
     return response
 
 def put(filename, content, cache):
-    orchestrator.lock_exclusive(filename)
-    if not os.path.isfile(os.path.join(FILES_FOLDER, filename)):
-        raise FileNotFoundError()
-    with open(os.path.join(FILES_FOLDER, filename), 'w') as request_file:
-        request_file.write(content)
-    cache.set(filename, content)
-    orchestrator.unlock(filename)
+    try:
+        orchestrator.lock_exclusive(filename)
+        if not os.path.isfile(os.path.join(FILES_FOLDER, filename)):
+            raise FileNotFoundError()
+        with open(os.path.join(FILES_FOLDER, filename), 'w') as request_file:
+            request_file.write(content)
+        cache.set(filename, content)
+    finally:
+        orchestrator.unlock(filename)
     return json.dumps({"status":"ok"})
 
 def post(filename, content, cache):
     orchestrator.lock_exclusive(filename)
-    os.makedirs(os.path.dirname(os.path.join(FILES_FOLDER, filename)), exist_ok=True)
-    with open(os.path.join(FILES_FOLDER, filename), 'x') as request_file:
-        request_file.write(content)
-    cache.set(filename, content)
-    orchestrator.unlock(filename)
+    try:
+        os.makedirs(os.path.dirname(os.path.join(FILES_FOLDER, filename)), exist_ok=True)
+        with open(os.path.join(FILES_FOLDER, filename), 'x') as request_file:
+            request_file.write(content)
+        cache.set(filename, content)
+    finally:
+        orchestrator.unlock(filename)
     return json.dumps({"status":"ok", "id": filename})
 
 
 def delete(filename, cache):
     orchestrator.lock_exclusive(filename)
-    os.remove(os.path.join(FILES_FOLDER, filename))
-    cache.remove(filename)
-    orchestrator.unlock(filename)
+    try:
+        os.remove(os.path.join(FILES_FOLDER, filename))
+        cache.remove(filename)
+    finally:
+        orchestrator.unlock(filename)
     return json.dumps({"status":"ok"})
 
 
