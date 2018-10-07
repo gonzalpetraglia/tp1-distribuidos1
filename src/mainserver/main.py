@@ -2,13 +2,14 @@ import socket
 import time
 from multiprocessing import Process, Queue, Value
 import os
-from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT
+from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT, FILESERVER_PREFIX, FILESERVER_NAME, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS
 from http_processer import http_process
 from http_responder import http_respond
 from log_module import log_loop
 import logging
 import pickle
 import signal
+import traceback
 from ctypes import c_ulong
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -35,7 +36,20 @@ def end_processers(processers_queue, processers):
     logger.debug('Finished all the processers')
 
 def end_fileservers():
-    time.sleep(1)
+
+    def get_fileserver_address(fileserver_index):
+        if FILESERVER_NAME: # Intended for localhost tests
+            fileserver_name = FILESERVER_NAME
+        else:
+            fileserver_name = FILESERVER_PREFIX + str(fileserver_index)
+        logger.debug('FILESERVER: {}:{}'.format(fileserver_name, FILESERVERS_PORTS))
+        return fileserver_name, FILESERVERS_PORTS
+    
+    for i in range(NUMBER_OF_FILESERVERS):
+        sock_fileserver = socket.socket()
+        sock_fileserver.connect(get_fileserver_address(i + 1))
+        sock_fileserver.sendall('END'.encode())
+        sock_fileserver.close()
     logger.debug('Finished all the fileservers')
 
 def end_responders(responders):
@@ -98,6 +112,7 @@ if __name__ == "__main__":
         except FinishingException:
             finished = True
             logger.debug('Going to finish :)')
+    incoming_clients_socket.close()
     every_client_finished = False
     while not every_client_finished: 
         every_client_finished = (clients_in_progress.value == 0)
@@ -113,4 +128,3 @@ if __name__ == "__main__":
     end_logger(logs_queue, logger_process)
 
     logger.info('Finished all the work')
-    

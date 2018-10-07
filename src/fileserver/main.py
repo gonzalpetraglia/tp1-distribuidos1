@@ -98,9 +98,10 @@ def delete(filename, cache):
     return json.dumps({"status":"ok"}), 200
 
 
-def fileserver_responder(cache):
+def fileserver_responder(cache, s):
     global gracefulQuit
     while not gracefulQuit:
+        there_is_a_processable_request = False
         try:
             c, addr = s.accept()
             request = read_request(lambda x: c.recv(x))
@@ -108,6 +109,8 @@ def fileserver_responder(cache):
             if request == 'END':
                 gracefulQuit = True
             else: 
+                there_is_a_processable_request = True
+
                 client, method, uri_postfix, body = request
                 response, status_code = treat_request(method, uri_postfix, body, cache)
             
@@ -119,32 +122,32 @@ def fileserver_responder(cache):
             status_code = 404
             logger.warn('File not found')
             response = json.dumps({"status": 'file_not_found'})
+        except socket.timeout:
+            pass
         except Exception:
             status_code = 500
             response = json.dumps({"status": 'unknown_error'})
             logger.error(traceback.format_exc())
 
-        try:
+        if there_is_a_processable_request:
             response_encoded = encode_response(client, status_code, response, uri_postfix, method)
             responses_queue_socket = socket.socket()
             responses_queue_socket.connect((MAINSERVER_NAME, RESPONSES_PORT))
             responses_queue_socket.sendall(response_encoded)
             responses_queue_socket.close()
             logger.debug('Sent, closing socket')
-        except Exception:
-            logger.warn(traceback.format_exc())
-            logger.warn('WTF')
-
+        
 if __name__ == "__main__":
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     s.bind(('0.0.0.0', FILESERVERS_PORTS))
     s.listen(5)
+    s.settimeout(5)
 
     cache = ProtectedLRUCache(CACHE_CAPACITY)
 
-    workers = [Thread(target=fileserver_responder, args=(cache,)) for i in range(FILESERVER_WORKERS)]
+    workers = [Thread(target=fileserver_responder, args=(cache, s,)) for i in range(1)]
 
     for worker in workers:
         worker.start()
