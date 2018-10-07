@@ -36,11 +36,14 @@ def encode_request(client_info, method, URI_postfix, body=None):
             + message_to_fileserver
 
 def read_request(read):
-    response_length_encoded = b''
-    while len(response_length_encoded) < MAX_BYTES_NEEDED_FOR_LENGTH:
-        bytes_to_be_read = MAX_BYTES_NEEDED_FOR_LENGTH - len(response_length_encoded)
-        response_length_encoded += read(bytes_to_be_read)
-    message_length = int.from_bytes(response_length_encoded, byteorder='big', signed=False)
+    message_header = b''
+    assert(len('END'.encode()) <= MAX_BYTES_NEEDED_FOR_LENGTH)
+    while len(message_header) < MAX_BYTES_NEEDED_FOR_LENGTH and message_header != 'END'.encode():
+        bytes_to_be_read = MAX_BYTES_NEEDED_FOR_LENGTH - len(message_header)
+        message_header += read(bytes_to_be_read)
+    if message_header == 'END'.encode():
+        return 'END'
+    message_length = int.from_bytes(message_header, byteorder='big', signed=False)
     message = b''
     while len(message) < message_length:
         message = read(message_length - len(message))
@@ -63,11 +66,14 @@ def encode_response(client, status_code, body, request_uri, method):
 
 
 def read_response(read):
-    response_length_encoded = b''
-    while len(response_length_encoded) < MAX_BYTES_NEEDED_FOR_LENGTH:
-        bytes_to_be_read = MAX_BYTES_NEEDED_FOR_LENGTH - len(response_length_encoded)
-        response_length_encoded += read(bytes_to_be_read)
-    response_length = int.from_bytes(response_length_encoded, byteorder='big', signed=False)
+    message_header = b''
+    assert(len('END'.encode()) <= MAX_BYTES_NEEDED_FOR_LENGTH)
+    while len(message_header) < MAX_BYTES_NEEDED_FOR_LENGTH and message_header != 'END'.encode():
+        bytes_to_be_read = MAX_BYTES_NEEDED_FOR_LENGTH - len(message_header)
+        message_header += read(bytes_to_be_read)
+    if message_header == 'END'.encode():
+        return 'END'
+    response_length = int.from_bytes(message_header, byteorder='big', signed=False)
     response_bytes = b''
     while len(response_bytes) < response_length:
         response_bytes = read(response_length - len(response_bytes))

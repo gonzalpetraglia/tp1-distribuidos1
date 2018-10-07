@@ -9,6 +9,8 @@ import uuid
 import traceback
 import  http_parser
 import logging
+import signal
+import time
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
@@ -52,19 +54,28 @@ def treat_message(parsed_request, client_socket, address, request_datetime):
 
 
 def http_process(accepted_clients_queue):
-    while True:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    finish = False
+    while not finish:
         try:
             logger.debug('Waiting for a new client')
-            sock, address = accepted_clients_queue.get()
-            logger.info('Going to read from socket from new client')
-            sock.settimeout(5)
-            parsed_message = http_parser.read_http_message(lambda x: sock.recv(x).decode())
-            treat_message(parsed_message, sock, address, datetime.now())
-            sock.close()
+            message = accepted_clients_queue.get()
+            logger.debug('Read {}'.format(message))
+            if message == 'END':
+                finish = True
+            else:
+                time.sleep(5)
+                sock, address = message    
+                logger.info('Going to read from socket from new client')
+                sock.settimeout(15)
+                parsed_message = http_parser.read_http_message(lambda x: sock.recv(x).decode())
+                treat_message(parsed_message, sock, address, datetime.now())
+                sock.close()
         except socket.timeout as e:
             error_message = 'timedout'
             request_uri = 'couldnt_parse_uri'
-            method = 'coudlnt_parse_method'
+            method = 'couldnt_parse_method'
             logger.warn('Timeout on read')
             send_response_error(400, error_message, sock, request_uri, method, address, datetime.now())
         except BadRequestError as e:
@@ -76,3 +87,4 @@ def http_process(accepted_clients_queue):
         except Exception as e:
             logger.error(traceback.format_exc())
             send_response_error(500, 'unknown_error', sock, "couldnt_parse_uri", "couldnt_parse_method", address, datetime.now())
+    logger.info('Finished processing')

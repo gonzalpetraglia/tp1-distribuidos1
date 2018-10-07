@@ -21,10 +21,12 @@ logger.setLevel(LOG_LEVEL)
 
 logger.info("Fileserver is up and running :)")
 
+
 FILES_FOLDER = os.path.join(FILES_FOLDER, str(math.ceil(random() * 100)))
 class InternalMethodNotSupported(Exception):
     pass
 
+gracefulQuit = False
 
 
 orchestrator = Orchestrator()
@@ -97,12 +99,17 @@ def delete(filename, cache):
 
 
 def fileserver_responder(cache):
-    while True:
+    global gracefulQuit
+    while not gracefulQuit:
         try:
             c, addr = s.accept()
-            client, method, uri_postfix, body = read_request(lambda x: c.recv(x))
+            request = read_request(lambda x: c.recv(x))
             c.close()
-            response, status_code = treat_request(method, uri_postfix, body, cache)
+            if request == 'END':
+                gracefulQuit = True
+            else: 
+                client, method, uri_postfix, body = request
+                response, status_code = treat_request(method, uri_postfix, body, cache)
             
         except FileExistsError:
             status_code = 500
