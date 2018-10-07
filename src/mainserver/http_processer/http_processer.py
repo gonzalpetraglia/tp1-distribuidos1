@@ -1,16 +1,18 @@
-from custom_exceptions import BadRequestError
 from datetime import datetime
-from lib.encoder import encode_request, MAX_MESSAGE_LENGTH_IN_BYTES, _encode_socket, encode_response, encode_client
 import socket
-from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL
 from hashlib import md5
 import json
 import uuid
 import traceback
-import  http_parser
 import logging
 import signal
 import time
+
+from http_processer.http_parser import read_http_message
+from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL
+from custom_exceptions import BadRequestError
+from lib.encoder import encode_request, MAX_MESSAGE_LENGTH_IN_BYTES, _encode_socket, encode_response, encode_client
+
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
@@ -69,7 +71,7 @@ def http_process(accepted_clients_queue):
                 sock, address = message    
                 logger.info('Going to read from socket from new client')
                 sock.settimeout(15)
-                parsed_message = http_parser.read_http_message(lambda x: sock.recv(x).decode())
+                parsed_message = read_http_message(lambda x: sock.recv(x).decode())
                 treat_message(parsed_message, sock, address, datetime.now())
                 sock.close()
         except socket.timeout as e:

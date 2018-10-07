@@ -1,9 +1,12 @@
-from lib.encoder import read_response, decode_client
 from datetime import datetime
-from configs import STATUS_CODE_MESSAGES, LOG_FORMAT, LOG_LEVEL
 import traceback
 import logging
 import signal
+import json
+
+from http_responder.http_response import gen_http_response
+from configs import STATUS_CODE_MESSAGES, LOG_FORMAT, LOG_LEVEL
+from lib.encoder import read_response, decode_client
 
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -39,31 +42,21 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue, clients_in_pr
                 logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
                 logger.debug('Body {}'.format(body))
                 status_code_message = STATUS_CODE_MESSAGES[status_code]
-                http_response = 'HTTP/1.1 {} {}\r\n'.format(status_code, status_code_message) + \
-                                'Date: {}\r\n'.format(datetime.utcnow())+\
-                                'Server: JSON-SERVER v1.0.0\r\n'+\
-                                'Content-Length: {}\r\n'.format(len(body))+\
-                                'Content-Type: application/json\r\n'+\
-                                'Connection: Closed\r\n\r\n'+\
-                                '{}\r\n'.format(body)
+                http_response = gen_http_response(status_code, status_code_message, datetime.utcnow(), body)
                 client_socket.sendall(http_response.encode())
                 logger.info("Done responding user, going to close the socket")
                 logger.debug(http_response)
                 client_socket.close()
                 send_log(logs_queue, method, status_code, request_uri, request_datetime, address)
-                with clients_in_progress.get_lock():
-                    clients_in_progress.value -= 1
         except Exception:
             logger.error(traceback.format_exc())
-            http_response = 'HTTP/1.1 {} {}\r\n'.format(500, "Internal Error") + \
-                            'Date: {}\r\n'.format(datetime.utcnow())+\
-                            'Server: JSON-SERVER v1.0.0\r\n'+\
-                            'Content-Length: {}\r\n'.format(len('{"status": "unknown_error"}\r\n'))+\
-                            'Content-Type: application/json\r\n'+\
-                            'Connection: Closed\r\n\r\n'+\
-                            '{"status": "unknown_error"}\r\n'
+            body = json.dumps({"status": "unknown_error"})
+            http_response = gen_http_response(500, "Internal Error", datetime.utcnow(), body)
             client_socket.sendall(http_response.encode())
             logger.info("Done responding user, going to close the socket")
             client_socket.close()
+        with clients_in_progress.get_lock():
+            clients_in_progress.value -= 1
+
     incoming_fileserver_responses_socket.close()
 
