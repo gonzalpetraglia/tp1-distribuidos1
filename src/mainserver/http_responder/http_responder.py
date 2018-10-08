@@ -7,7 +7,7 @@ from multiprocessing import Process
 
 from http_responder.http_response import gen_http_response
 from configs import STATUS_CODE_MESSAGES, LOG_FORMAT, LOG_LEVEL
-from lib.encoder import read_response, decode_client
+from lib.encoder import read_response, decode_client, EndMessageReceived
 
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -26,8 +26,8 @@ class HttpResponder(Process):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
-        finish = False
-        while not finish:
+        self.finish = False
+        while not self.finish:
             self._http_respond()
 
         self.incoming_fileserver_responses_socket.close()
@@ -45,22 +45,21 @@ class HttpResponder(Process):
         try:
             fileserver_response_socket, address = self.incoming_fileserver_responses_socket.accept()
             response = read_response(lambda x: fileserver_response_socket.recv(x))
-            fileserver_response_socket.close()
-            if response == 'END':
-                finish = True
-            else:
-                client_info, status_code, body, request_uri, method = response
-                client_socket, address, request_datetime = decode_client(client_info)
-                client_socket.settimeout(5)
-                logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
-                logger.debug('Body {}'.format(body))
-                status_code_message = STATUS_CODE_MESSAGES[status_code]
-                http_response = gen_http_response(status_code, status_code_message, datetime.utcnow(), body)
-                client_socket.sendall(http_response.encode())
-                logger.info("Done responding user, going to close the socket")
-                logger.debug(http_response)
-                client_socket.close()
-                self._send_log(method, status_code, request_uri, request_datetime, address)
+            fileserver_response_socket.close()        
+            client_info, status_code, body, request_uri, method = response
+            client_socket, address, request_datetime = decode_client(client_info)
+            client_socket.settimeout(5)
+            logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
+            logger.debug('Body {}'.format(body))
+            status_code_message = STATUS_CODE_MESSAGES[status_code]
+            http_response = gen_http_response(status_code, status_code_message, datetime.utcnow(), body)
+            client_socket.sendall(http_response.encode())
+            logger.info("Done responding user, going to close the socket")
+            logger.debug(http_response)
+            client_socket.close()
+            self._send_log(method, status_code, request_uri, request_datetime, address)
+        except EndMessageReceived:
+            self.finish = True
         except Exception:
             logger.error(traceback.format_exc())
             body = json.dumps({"status": "unknown_error"})

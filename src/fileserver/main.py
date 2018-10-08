@@ -11,7 +11,7 @@ from threading import Thread
 from cache_lru import ProtectedLRUCache
 from orchestrator import Orchestrator
 
-from lib.encoder import read_request, encode_response
+from lib.encoder import read_request, encode_response, EndMessageReceived
 from lib.response_communicator import communicate_response
 from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL
 
@@ -117,13 +117,10 @@ class FileServerWorker(Thread):
             c, addr = self.incoming_requests.accept()
             request = read_request(lambda x: c.recv(x))
             c.close()
-            if request == 'END':
-                gracefulQuit = True
-            else: 
-                there_is_a_processable_request = True
+            there_is_a_processable_request = True
 
-                client, method, uri_postfix, body = request
-                response, status_code = self._treat_request(method, uri_postfix, body)
+            client, method, uri_postfix, body = request
+            response, status_code = self._treat_request(method, uri_postfix, body)
             
         except FileExistsError:
             status_code = 500
@@ -135,17 +132,15 @@ class FileServerWorker(Thread):
             response = json.dumps({"status": 'file_not_found'})
         except socket.timeout:
             pass
+        except EndMessageReceived:
+            gracefulQuit = True
         except Exception:
             status_code = 500
             response = json.dumps({"status": 'unknown_error'})
             logger.error(traceback.format_exc())
-        try:
-
-            if there_is_a_processable_request:
-                communicate_response(client, status_code, response, uri_postfix, method, MAINSERVER_NAME, RESPONSES_PORT)
-                logger.debug('Sent, closing socket')
-        except Exception:
-            logger.error(traceback.format_exc())
+        if there_is_a_processable_request:
+            communicate_response(client, status_code, response, uri_postfix, method, MAINSERVER_NAME, RESPONSES_PORT)
+            logger.debug('Sent, closing socket')
 
         
 if __name__ == "__main__":

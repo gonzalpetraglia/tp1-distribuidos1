@@ -5,14 +5,16 @@ import logging
 import pickle
 import signal
 import traceback
-from multiprocessing import Process, Queue, Value
+from multiprocessing import Queue, Value
 from ctypes import c_ulong
 
 from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT, FILESERVER_PREFIX, FILESERVER_NAME, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS
 from log_module import AuditLogger
 from http_processer.http_processer import HttpProcesser
 from http_responder.http_responder import HttpResponder
-from lib.response_communicator import communicate_end
+from lib.response_communicator import communicate_end as communicate_end_to_responder
+from lib.request_communicator import communicate_end as communicate_end_to_fileserver
+from lib.encoder import END_TOKEN
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
@@ -31,43 +33,29 @@ signal.signal(signal.SIGTERM, finish)
 
 def end_processers(processers_queue, processers):
     for i in range(len(processers)):
-        processers_queue.put('END')
+        processers_queue.put(END_TOKEN)
     logger.debug('Signaled every processer')
     for processer in processers:
         processer.join()
     logger.debug('Finished all the processers')
 
 def end_fileservers():
-
-    def get_fileserver_address(fileserver_index):
-        if FILESERVER_NAME: # Intended for localhost tests
-            fileserver_name = FILESERVER_NAME
-        else:
-            fileserver_name = FILESERVER_PREFIX + str(fileserver_index)
-        logger.debug('FILESERVER: {}:{}'.format(fileserver_name, FILESERVERS_PORTS))
-        return fileserver_name, FILESERVERS_PORTS
     
     for i in range(NUMBER_OF_FILESERVERS):
-        fileserver_name, fileserver_port = get_fileserver_address(i + 1)
-        communicate_end(fileserver_name, fileserver_port)
+        fileserver_index = i + 1
+        communicate_end_to_fileserver(fileserver_index)
     logger.debug('Finished all the fileservers')
 
 def end_responders(responders):
-    def send_message_responders():
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', RESPONSES_PORT))
-        s.sendall('END'.encode())
-
-
     for i in range(len(responders)):
-        send_message_responders()
+        communicate_end_to_responder('127.0.0.1', RESPONSES_PORT)
     for responder in responders:
         responder.join()
     logger.debug('Finished all the responders')
 
 
 def end_logger(logs_queue, logger_process):
-    logs_queue.put('END')
+    logs_queue.put(END_TOKEN)
     logger_process.join()
     logger.debug('Finished the logger')
 

@@ -6,6 +6,10 @@ import math
 
 MAX_MESSAGE_LENGTH_IN_BYTES = 2 ** (32)
 MAX_BYTES_NEEDED_FOR_LENGTH = math.ceil(math.log(MAX_MESSAGE_LENGTH_IN_BYTES, 2) / 8)
+END_TOKEN = 'END'
+
+class EndMessageReceived(Exception):
+    pass
 
 def _encode_socket(obj):
     buf = StringIO()
@@ -37,19 +41,18 @@ def encode_request(client_info, method, URI_postfix, body=None):
 
 def read_request(read):
     message_header = b''
-    assert(len('END'.encode()) <= MAX_BYTES_NEEDED_FOR_LENGTH)
-    while len(message_header) < MAX_BYTES_NEEDED_FOR_LENGTH and message_header != 'END'.encode():
+    while len(message_header) < MAX_BYTES_NEEDED_FOR_LENGTH:
         bytes_to_be_read = MAX_BYTES_NEEDED_FOR_LENGTH - len(message_header)
         message_header += read(bytes_to_be_read)
-    if message_header == 'END'.encode():
-        return 'END'
     message_length = int.from_bytes(message_header, byteorder='big', signed=False)
     message = b''
     while len(message) < message_length:
         message = read(message_length - len(message))
-    request_dict = pickle.loads(message)
-    body = request_dict['body'] if 'body' in request_dict else None
-    return request_dict['client'], request_dict['method'], request_dict['URI_postfix'], body
+    request = pickle.loads(message)
+    if request == END_TOKEN:
+        raise EndMessageReceived
+    body = request['body'] if 'body' in request else None
+    return request['client'], request['method'], request['URI_postfix'], body
 
 
 def encode_response(client, status_code, body, request_uri, method):
@@ -67,16 +70,18 @@ def encode_response(client, status_code, body, request_uri, method):
 
 def read_response(read):
     message_header = b''
-    assert(len('END'.encode()) <= MAX_BYTES_NEEDED_FOR_LENGTH)
-    while len(message_header) < MAX_BYTES_NEEDED_FOR_LENGTH and message_header != 'END'.encode():
+    while len(message_header) < MAX_BYTES_NEEDED_FOR_LENGTH:
         bytes_to_be_read = MAX_BYTES_NEEDED_FOR_LENGTH - len(message_header)
         message_header += read(bytes_to_be_read)
-    if message_header == 'END'.encode():
-        return 'END'
     response_length = int.from_bytes(message_header, byteorder='big', signed=False)
     response_bytes = b''
     while len(response_bytes) < response_length:
         response_bytes = read(response_length - len(response_bytes))
-    response_dict = pickle.loads(response_bytes)
-    return response_dict['client'], int(response_dict['status_code']), response_dict['body'], response_dict['request_uri'], response_dict['method']
+    response = pickle.loads(response_bytes)
+    if response == END_TOKEN:
+        raise EndMessageReceived
+    return response['client'], int(response['status_code']), response['body'], response['request_uri'], response['method']
 
+def encode_end_message():
+    return len(pickle.dumps(END_TOKEN)).to_bytes(MAX_BYTES_NEEDED_FOR_LENGTH, byteorder='big', signed=False) +\
+                pickle.dumps(END_TOKEN)

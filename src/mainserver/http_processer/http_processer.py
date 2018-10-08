@@ -12,7 +12,7 @@ from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_O
 from custom_exceptions import BadRequestError
 from lib.response_communicator import communicate_response
 from lib.request_communicator import communicate_request
-from lib.encoder import encode_client
+from lib.encoder import encode_client, END_TOKEN
 from multiprocessing import Process
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -61,7 +61,7 @@ class HttpProcesser(Process):
             logger.debug('Waiting for a new client')
             message = self.accepted_clients_queue.get()
             logger.debug('Read {}'.format(message))
-            if message == 'END':
+            if message == END_TOKEN:
                 self.finish = True
             else:
                 sock, address = message    

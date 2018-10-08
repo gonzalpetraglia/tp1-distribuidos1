@@ -1,11 +1,12 @@
 import os
 import logging
 import traceback
-from configs import LOGFILE, LOG_LEVEL, LOG_FORMAT
 import logging
 import signal
 from multiprocessing import Process
 
+from configs import LOGFILE, LOG_LEVEL, LOG_FORMAT
+from lib.encoder import END_TOKEN
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
 logger.setLevel(LOG_LEVEL)
@@ -29,7 +30,7 @@ class AuditLogger(Process):
                 try:
                     message = self.logs_queue.get()
                     logger.debug('Logger received {}'.format(message))
-                    if message == 'END':
+                    if message == END_TOKEN:
                         finish = True
                     else: 
                         log_dict = message
