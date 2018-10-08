@@ -1,17 +1,17 @@
 import socket
-import pickle
 import os
 import json
-from lib.encoder import read_request, encode_response
-from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL
-import portalocker
 import traceback
 import logging
 from random import random
 import math
-from threading import Thread, Condition, Lock
+from threading import Thread
 from cache_lru import ProtectedLRUCache
 from orchestrator import Orchestrator
+
+from lib.encoder import read_request, encode_response
+from lib.response_communicator import communicate_response
+from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL
 
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -128,14 +128,14 @@ def fileserver_responder(cache, s):
             status_code = 500
             response = json.dumps({"status": 'unknown_error'})
             logger.error(traceback.format_exc())
+        try:
 
-        if there_is_a_processable_request:
-            response_encoded = encode_response(client, status_code, response, uri_postfix, method)
-            responses_queue_socket = socket.socket()
-            responses_queue_socket.connect((MAINSERVER_NAME, RESPONSES_PORT))
-            responses_queue_socket.sendall(response_encoded)
-            responses_queue_socket.close()
-            logger.debug('Sent, closing socket')
+            if there_is_a_processable_request:
+                communicate_response(client, status_code, response, uri_postfix, method, MAINSERVER_NAME, RESPONSES_PORT)
+                logger.debug('Sent, closing socket')
+        except Exception:
+            logger.error(traceback.format_exc())
+
         
 if __name__ == "__main__":
 

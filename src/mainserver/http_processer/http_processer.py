@@ -1,6 +1,5 @@
 from datetime import datetime
 import socket
-from hashlib import md5
 import json
 import uuid
 import traceback
@@ -11,8 +10,9 @@ import time
 from http_processer.http_parser import read_http_message
 from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL
 from custom_exceptions import BadRequestError
-from lib.encoder import encode_request, MAX_MESSAGE_LENGTH_IN_BYTES, _encode_socket, encode_response, encode_client
-
+from lib.response_communicator import communicate_response
+from lib.request_communicator import communicate_request
+from lib.encoder import encode_client
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
@@ -20,23 +20,8 @@ logger.setLevel(LOG_LEVEL)
 
 def send_response_error(status_code, message, client_socket, request_uri, method, address, request_datetime):
     client_info = encode_client(client_socket, request_datetime, address)
-    response_encoded = encode_response(client_info, status_code, json.dumps({"status": message}), request_uri, method)
-    responses_queue_socket = socket.socket()
-    responses_queue_socket.connect(('127.0.0.1', RESPONSES_PORT))
-    responses_queue_socket.sendall(response_encoded)
-    responses_queue_socket.close()
-
-def calculate_fileserver(URI_postfix):
-    return int(md5(URI_postfix.encode()).hexdigest(), 16) % NUMBER_OF_FILESERVERS + 1
-
-def get_fileserver_address(fileserver_index):
-    if FILESERVER_NAME: # Intended for localhost tests
-        fileserver_name = FILESERVER_NAME
-    else:
-        fileserver_name = FILESERVER_PREFIX + str(fileserver_index)
-    logger.debug('FILESERVER: {}:{}'.format(fileserver_name, FILESERVERS_PORTS))
-    return fileserver_name, FILESERVERS_PORTS
-
+    communicate_response(client_info, status_code, json.dumps({"status": message}), request_uri, method, '127.0.0.1', RESPONSES_PORT)
+    
 
 def treat_message(parsed_request, client_socket, address, request_datetime):
     try:
@@ -44,12 +29,8 @@ def treat_message(parsed_request, client_socket, address, request_datetime):
         request_uri = parsed_request['request_uri']
         body = parsed_request['body'] if method in ['POST', 'PUT'] else None
         request_uri = request_uri + '/' + str(uuid.uuid4()) if method == 'POST' else request_uri
-        fileserver_index = calculate_fileserver(request_uri)
-        message = encode_request(encode_client(client_socket, request_datetime, address), method, request_uri, body)
-        sock_fileserver = socket.socket()
-        sock_fileserver.connect(get_fileserver_address(fileserver_index))
-        sock_fileserver.sendall(message)
-        sock_fileserver.close()
+        client = encode_client(client_socket, request_datetime, address)
+        communicate_request(client, method, request_uri, body)
     except Exception:
         logger.error(traceback.format_exc())
         send_response_error(500, 'unknown_error', client_socket, request_uri, method, address, request_datetime)
@@ -69,7 +50,7 @@ def http_process(accepted_clients_queue):
             else:
                 sock, address = message    
                 logger.info('Going to read from socket from new client')
-                sock.settimeout(15)
+                sock.settimeout(5)
                 parsed_message = read_http_message(lambda x: sock.recv(x).decode())
                 treat_message(parsed_message, sock, address, datetime.now())
                 sock.close()

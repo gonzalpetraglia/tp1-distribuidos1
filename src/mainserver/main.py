@@ -12,6 +12,7 @@ from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, R
 from log_module import log_loop
 from http_processer.http_processer import http_process
 from http_responder.http_responder import http_respond
+from lib.response_communicator import communicate_end
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger('mainserver')
@@ -47,10 +48,8 @@ def end_fileservers():
         return fileserver_name, FILESERVERS_PORTS
     
     for i in range(NUMBER_OF_FILESERVERS):
-        sock_fileserver = socket.socket()
-        sock_fileserver.connect(get_fileserver_address(i + 1))
-        sock_fileserver.sendall('END'.encode())
-        sock_fileserver.close()
+        fileserver_name, fileserver_port = get_fileserver_address(i + 1)
+        communicate_end(fileserver_name, fileserver_port)
     logger.debug('Finished all the fileservers')
 
 def end_responders(responders):

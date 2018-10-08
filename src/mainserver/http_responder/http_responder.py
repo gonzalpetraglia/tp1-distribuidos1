@@ -38,7 +38,7 @@ def http_respond(incoming_fileserver_responses_socket, logs_queue, clients_in_pr
             else:
                 client_info, status_code, body, request_uri, method = response
                 client_socket, address, request_datetime = decode_client(client_info)
-                client_socket.settimeout(15)
+                client_socket.settimeout(5)
                 logger.info('Going to respond {} {} {}'.format(method, request_uri, status_code))
                 logger.debug('Body {}'.format(body))
                 status_code_message = STATUS_CODE_MESSAGES[status_code]
