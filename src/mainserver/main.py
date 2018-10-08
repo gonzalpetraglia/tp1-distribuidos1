@@ -9,9 +9,9 @@ from multiprocessing import Process, Queue, Value
 from ctypes import c_ulong
 
 from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT, FILESERVER_PREFIX, FILESERVER_NAME, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS
-from log_module import log_loop
+from log_module import AuditLogger
 from http_processer.http_processer import http_process
-from http_responder.http_responder import http_respond
+from http_responder.http_responder import HttpResponder
 from lib.response_communicator import communicate_end
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -83,8 +83,8 @@ if __name__ == "__main__":
 
 
     processers = [Process(target=http_process, args=(accepted_clients_queue,)) for i in range(NUMBER_OF_PROCESSERS)]
-    responders = [Process(target=http_respond, args=(fileserver_responses_socket, logs_queue, clients_in_progress,)) for i in range(NUMBER_OF_RESPONDERS)]
-    logger_process = Process(target=log_loop, args=(logs_queue,))
+    responders = [HttpResponder(fileserver_responses_socket, logs_queue, clients_in_progress) for i in range(NUMBER_OF_RESPONDERS)]
+    logger_process = AuditLogger(logs_queue)
     logger.info("Going to start {} processers and {} responders ".format(NUMBER_OF_PROCESSERS, NUMBER_OF_RESPONDERS))
 
     for processer in processers:
