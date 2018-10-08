@@ -10,7 +10,7 @@ from ctypes import c_ulong
 
 from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT, FILESERVER_PREFIX, FILESERVER_NAME, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS
 from log_module import AuditLogger
-from http_processer.http_processer import http_process
+from http_processer.http_processer import HttpProcesser
 from http_responder.http_responder import HttpResponder
 from lib.response_communicator import communicate_end
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     fileserver_responses_socket.listen(RESPONSES_SOCKET_LENGTH)
 
 
-    processers = [Process(target=http_process, args=(accepted_clients_queue,)) for i in range(NUMBER_OF_PROCESSERS)]
+    processers = [HttpProcesser(accepted_clients_queue) for i in range(NUMBER_OF_PROCESSERS)]
     responders = [HttpResponder(fileserver_responses_socket, logs_queue, clients_in_progress) for i in range(NUMBER_OF_RESPONDERS)]
     logger_process = AuditLogger(logs_queue)
     logger.info("Going to start {} processers and {} responders ".format(NUMBER_OF_PROCESSERS, NUMBER_OF_RESPONDERS))
