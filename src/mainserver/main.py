@@ -8,7 +8,7 @@ import traceback
 from multiprocessing import Queue, Value
 from ctypes import c_ulong
 
-from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT, FILESERVER_PREFIX, FILESERVER_NAME, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS
+from configs import NUMBER_OF_RESPONDERS, NUMBER_OF_PROCESSERS, REQUESTS_PORT, RESPONSES_PORT, RESPONSES_SOCKET_LENGTH, REQUESTS_SOCKET_LENGTH, LOG_LEVEL, LOG_FORMAT, FILESERVER_PREFIX, FILESERVER_NAME, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS,  RESPONSES_HOST_BIND, REQUESTS_HOST_BIND, RESPONSES_HOST_SEND
 from log_module import AuditLogger
 from http_processer.http_processer import HttpProcesser
 from http_responder.http_responder import HttpResponder
@@ -48,7 +48,7 @@ def end_fileservers():
 
 def end_responders(responders):
     for i in range(len(responders)):
-        communicate_end_to_responder('127.0.0.1', RESPONSES_PORT)
+        communicate_end_to_responder(RESPONSES_HOST_SEND, RESPONSES_PORT)
     for responder in responders:
         responder.join()
     logger.debug('Finished all the responders')
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     fileserver_responses_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    fileserver_responses_socket.bind(('0.0.0.0', RESPONSES_PORT))
+    fileserver_responses_socket.bind((RESPONSES_HOST_BIND, RESPONSES_PORT))
     fileserver_responses_socket.listen(RESPONSES_SOCKET_LENGTH)
 
 
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
 
     incoming_clients_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    incoming_clients_socket.bind(('0.0.0.0', REQUESTS_PORT))
+    incoming_clients_socket.bind((REQUESTS_HOST_BIND, REQUESTS_PORT))
     incoming_clients_socket.listen(REQUESTS_SOCKET_LENGTH)
     finished = False
 

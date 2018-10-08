@@ -8,7 +8,7 @@ import signal
 import time
 
 from http_processer.http_parser import read_http_message
-from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL
+from configs import FILESERVER_NAME, FILESERVER_PREFIX, RESPONSES_PORT, NUMBER_OF_FILESERVERS, FILESERVERS_PORTS, LOG_FORMAT, LOG_LEVEL, RESPONSES_HOST_SEND
 from custom_exceptions import BadRequestError
 from lib.response_communicator import communicate_response
 from lib.request_communicator import communicate_request
@@ -40,7 +40,7 @@ class HttpProcesser(Process):
 
     def _send_response_error(self, status_code, message, client_socket, request_uri, method, address, request_datetime):
         client_info = encode_client(client_socket, request_datetime, address)
-        communicate_response(client_info, status_code, json.dumps({"status": message}), request_uri, method, '127.0.0.1', RESPONSES_PORT)
+        communicate_response(client_info, status_code, json.dumps({"status": message}), request_uri, method, RESPONSES_HOST_SEND, RESPONSES_PORT)
         
 
     def _treat_message(self, parsed_request, client_socket, address, request_datetime):

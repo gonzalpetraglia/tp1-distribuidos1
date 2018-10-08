@@ -13,7 +13,7 @@ from orchestrator import Orchestrator
 
 from lib.encoder import read_request, encode_response, EndMessageReceived
 from lib.response_communicator import communicate_response
-from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL
+from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL, FILESERVER_HOST_BIND
 
 
 logging.basicConfig(format=LOG_FORMAT)
@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
     incoming_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    incoming_socket.bind(('0.0.0.0', FILESERVERS_PORTS))
+    incoming_socket.bind((FILESERVER_HOST_BIND, FILESERVERS_PORTS))
     incoming_socket.listen(5)
     incoming_socket.settimeout(5)
 
