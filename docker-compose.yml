@@ -9,7 +9,6 @@ services:
       - ./files:/files
     environment:
       - FILES_FOLDER=/files
-      - CACHE_CAPACITY=0
     env_file:
       - ./docker-variables.env
     networks:
@@ -28,7 +27,6 @@ services:
       - LOGFILE=/logs/logs
       - NUMBER_OF_RESPONDERS=25
       - NUMBER_OF_PROCESSERS=25
-      - VERBOSITY=1
     networks:
       - files
     links:

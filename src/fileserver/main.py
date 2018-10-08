@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     cache = ProtectedLRUCache(CACHE_CAPACITY)
 
-    workers = [Thread(target=fileserver_responder, args=(cache, s,)) for i in range(1)]
+    workers = [Thread(target=fileserver_responder, args=(cache, s,)) for i in range(20)]
 
     for worker in workers:
         worker.start()

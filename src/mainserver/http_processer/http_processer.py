@@ -67,7 +67,6 @@ def http_process(accepted_clients_queue):
             if message == 'END':
                 finish = True
             else:
-                time.sleep(5)
                 sock, address = message    
                 logger.info('Going to read from socket from new client')
                 sock.settimeout(15)
