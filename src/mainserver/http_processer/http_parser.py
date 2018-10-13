@@ -79,11 +79,11 @@ def read_http_message(read):
     if 'content-length' in parsed_message['headers']:
         body = body_init
         body_bytes_read = len(body_init)
-
-        while body_bytes_read < int(parsed_message['headers']['content-length']):
+        bytes_to_be_read = int(parsed_message['headers']['content-length'])
+        while body_bytes_read < bytes_to_be_read:
             chunk = read(2048)
             body += chunk
             body_bytes_read += len(chunk)
         parsed_message["body"] = body
-        
+        logger.debug("Done reading body")
     return parsed_message

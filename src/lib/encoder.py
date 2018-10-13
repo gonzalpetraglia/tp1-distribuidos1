@@ -8,6 +8,7 @@ MAX_MESSAGE_LENGTH_IN_BYTES = 2 ** (32)
 MAX_BYTES_NEEDED_FOR_LENGTH = math.ceil(math.log(MAX_MESSAGE_LENGTH_IN_BYTES, 2) / 8)
 END_TOKEN = 'END'
 
+
 class EndMessageReceived(Exception):
     pass
 
@@ -46,8 +47,11 @@ def read_request(read):
         message_header += read(bytes_to_be_read)
     message_length = int.from_bytes(message_header, byteorder='big', signed=False)
     message = b''
-    while len(message) < message_length:
-        message = read(message_length - len(message))
+    bytes_read = 0
+    while bytes_read < message_length:
+        chunk = read(2048)
+        message += chunk
+        bytes_read += len(chunk)
     request = pickle.loads(message)
     if request == END_TOKEN:
         raise EndMessageReceived
@@ -75,8 +79,11 @@ def read_response(read):
         message_header += read(bytes_to_be_read)
     response_length = int.from_bytes(message_header, byteorder='big', signed=False)
     response_bytes = b''
-    while len(response_bytes) < response_length:
-        response_bytes = read(response_length - len(response_bytes))
+    response_bytes_read = 0
+    while response_bytes_read < response_length:
+        chunk = read(2048)
+        response_bytes += chunk
+        response_bytes_read += len(chunk)
     response = pickle.loads(response_bytes)
     if response == END_TOKEN:
         raise EndMessageReceived
