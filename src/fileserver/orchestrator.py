@@ -1,8 +1,10 @@
 from threading import Condition
-
+from multiprocessing import Manager
 class Orchestrator(object):
-    is_free_to_go = Condition()
-    file_locks = {}
+    def __init__(self):
+        m = Manager()
+        self.is_free_to_go = m.Condition()
+        self.file_locks = m.dict()
     def lock_exclusive(self, filename):
         with self.is_free_to_go:
             self.is_free_to_go.wait_for(lambda: filename not in self.file_locks)

@@ -5,7 +5,7 @@ NUMBER_OF_FILESERVERS=$NUMBER_OF_FILESERVERS
 VERBOSITY=4
 CACHE_CAPACITY=0" > docker-variables.env
 
-docker-compose up --scale file=$NUMBER_OF_FILESERVERS -d &&
+docker-compose up --build --scale file=$NUMBER_OF_FILESERVERS -d &&
 echo "---- Without cache -----" &&
 python3 src/lots_of_gets.py &&
 docker-compose stop &&
@@ -15,7 +15,7 @@ NUMBER_OF_FILESERVERS=$NUMBER_OF_FILESERVERS
 VERBOSITY=4
 CACHE_CAPACITY=2250" > docker-variables.env && 
 
-docker-compose up --scale file=$NUMBER_OF_FILESERVERS -d &&
+docker-compose up --build --scale file=$NUMBER_OF_FILESERVERS -d &&
 echo "---- Without cache -----" &&
 python3 src/lots_of_gets.py &&
 docker-compose stop

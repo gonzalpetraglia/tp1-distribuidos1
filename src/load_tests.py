@@ -5,7 +5,7 @@ import time
 
 from large_file import very_large_file
 
-NUMBER_OF_REQUESTS_PER_PROCESS  = 100
+NUMBER_OF_REQUESTS_PER_PROCESS  = 1000
 NUMBER_OF_PROCESSES = 10
 PREFIX = 'http://localhost:8080'
 def post_get(params):

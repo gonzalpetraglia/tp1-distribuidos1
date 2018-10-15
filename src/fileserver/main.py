@@ -6,10 +6,11 @@ import logging
 from random import random
 import math
 import signal
-from threading import Thread
 
 from cache_lru import ProtectedLRUCache
 from orchestrator import Orchestrator
+from threading import Thread
+from multiprocessing import Process
 
 from lib.encoder import read_request, encode_response, EndMessageReceived
 from lib.response_communicator import communicate_response
@@ -31,7 +32,7 @@ gracefulQuit = False
 orchestrator = Orchestrator()
 
 
-class FileServerWorker(Thread):
+class FileServerWorker(Process):
     def __init__(self, incoming_requests, cache):
         self.incoming_requests = incoming_requests
         self.cache = cache

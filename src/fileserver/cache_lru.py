@@ -1,28 +1,34 @@
 import collections
 from threading import Lock
+from multiprocessing import Manager
 
 class ProtectedLRUCache:
-    
     def __init__(self, capacity):
-        self.capacity = capacity # Note that this capacity is in # of keys, value pairs; maybe this should be changed to a memory usage capacity
-        self.cache = collections.OrderedDict()
-        self.lock = Lock()
+        m = Manager()
+        self.capacity = capacity
+        self.tm = m.Value('i', 0)
+        self.cache = m.dict()
+        self.lru = m.dict()
+        self.lock = m.Lock()
+
 
     def get(self, key):
         with self.lock:
-            value = self.cache.pop(key)
-            self.cache[key] = value
-            return value
+            self.lru[key] = self.tm.value
+            self.tm.value += 1
+            return self.cache[key]
 
     def set(self, key, value):
         with self.lock:
             if self.capacity:
-                try:
-                    self.cache.pop(key)
-                except KeyError:
-                    if len(self.cache) >= self.capacity:
-                        self.cache.popitem(last=False)
+                if len(self.cache) >= self.capacity:
+                    # find the LRU entry
+                    old_key = min(self.lru.keys(), key=lambda k:self.lru[k])
+                    self.cache.pop(old_key)
+                    self.lru.pop(old_key)
                 self.cache[key] = value
+                self.lru[key] = self.tm.value
+                self.tm.value += 1
 
     def remove(self, key):
         with self.lock:
