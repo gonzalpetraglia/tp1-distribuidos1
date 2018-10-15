@@ -10,8 +10,7 @@ import signal
 from cache_lru import ProtectedLRUCache
 from orchestrator import Orchestrator
 from threading import Thread
-from multiprocessing import Process
-
+from multiprocessing import Process, Value
 from lib.encoder import read_request, encode_response, EndMessageReceived
 from lib.response_communicator import communicate_response
 from configs import FILES_FOLDER, RESPONSES_PORT, FILESERVERS_PORTS, MAINSERVER_NAME, FILESERVER_WORKERS, CACHE_CAPACITY, LOG_FORMAT, LOG_LEVEL, FILESERVER_HOST_BIND
@@ -26,14 +25,13 @@ logger.info("Fileserver is up and running :)")
 
 
 FILES_FOLDER = os.path.join(FILES_FOLDER, str(math.ceil(random() * 100)))
-gracefulQuit = False
 
 
 orchestrator = Orchestrator()
 
 
 class FileServerWorker(Process):
-    def __init__(self, incoming_requests, cache):
+    def __init__(self, incoming_requests, cache, gracefulQuit):
         self.incoming_requests = incoming_requests
         self.cache = cache
         self.handlers = {
@@ -42,12 +40,11 @@ class FileServerWorker(Process):
             'POST': self._post,
             'PUT': self._put
         }
+        self.gracefulQuit = gracefulQuit
         super(FileServerWorker, self).__init__()
 
     def run(self):
-
-        global gracefulQuit
-        while not gracefulQuit:
+        while self.gracefulQuit.value == 0:
             self._fileserver_respond()
             
         logger.info('Finished processing')
@@ -112,7 +109,6 @@ class FileServerWorker(Process):
 
 
     def _fileserver_respond(self):
-        global gracefulQuit
         there_is_a_processable_request = False
         try:
             c, addr = self.incoming_requests.accept()
@@ -134,7 +130,7 @@ class FileServerWorker(Process):
         except socket.timeout:
             pass
         except EndMessageReceived:
-            gracefulQuit = True
+            self.gracefulQuit.value = 1
         except Exception:
             status_code = 500
             response = json.dumps({"status": 'unknown_error'})
@@ -145,6 +141,7 @@ class FileServerWorker(Process):
 
         
 if __name__ == "__main__":
+    gracefulQuit = Value('i', 0)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
@@ -157,7 +154,7 @@ if __name__ == "__main__":
 
     cache = ProtectedLRUCache(CACHE_CAPACITY)
 
-    workers = [FileServerWorker(incoming_socket, cache) for i in range(20)]
+    workers = [FileServerWorker(incoming_socket, cache, gracefulQuit) for i in range(20)]
 
     for worker in workers:
         worker.start()
